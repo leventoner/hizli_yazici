@@ -1,0 +1,23 @@
+## [Visual Studio]
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## [Output]
+*.exe
+*.dll
+*.pdb
+*.msi
+*.zip
+
+## [Environment]
+.env
+settings.json
+
+## [User Specific]
+*.log
+*.tmp
