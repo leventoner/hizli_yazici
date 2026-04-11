@@ -1,4 +1,4 @@
-## [Visual Studio]
+## Visual Studio
 .vs/
 [Bb]in/
 [Oo]bj/
@@ -6,18 +6,45 @@
 *.suo
 *.userosscache
 *.sln.docstates
+*.rsuser
 
-## [Output]
+## Build Output
 *.exe
 *.dll
 *.pdb
 *.msi
 *.zip
+*.app
+*.apk
+*.ipa
 
-## [Environment]
+## Published Files
+publish/
+bin/
+obj/
+
+## Environment
 .env
+.env.local
+.env.*.local
 settings.json
+appsettings.json
 
-## [User Specific]
+## User Specific
 *.log
 *.tmp
+*.temp
+*.cache
+
+## OS
+Thumbs.db
+.DS_Store
+desktop.ini
+$RECYCLE.BIN/
+
+## IDE
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

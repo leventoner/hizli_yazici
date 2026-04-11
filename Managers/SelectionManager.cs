@@ -12,6 +12,7 @@ namespace YaziciCS.Managers
         private System.Windows.Point _mouseDownPos;
         private DateTime _lastUpTime = DateTime.MinValue;
         private int _clickCount = 0;
+        private string _lastClipboardText = "";
         
         public Action<System.Windows.Point> OnTextSelected { get; set; }
         public Action OnClickOutside { get; set; }
@@ -46,6 +47,9 @@ namespace YaziciCS.Managers
             }
 
             _mouseDownPos = currentPos;
+
+            // Her tıklamada clipboard içeriğini kaydet (çift tıklama veya sürükleme sonrası metin seçildiğinde karşılaştırmak için)
+            _lastClipboardText = TextService.GetClipboardText() ?? "";
         }
 
         private void MouseHook_OnLeftButtonUp(int x, int y)
@@ -84,28 +88,22 @@ namespace YaziciCS.Managers
         {
             try 
             {
-                // We no longer Clear() because it causes more conflict than it solves
-                // Instead, we just try to get the text after sending Ctrl+C
-                
-                // Simulate Ctrl+C
+                // Simulate Ctrl+C to copy selected text
                 keybd_event(VK_CONTROL, 0, 0, 0);
                 keybd_event(VK_C, 0, 0, 0);
                 keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0);
                 keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
 
-                // Give it slightly more time to ensure OS has finished selection
+                // Give OS time to finish selection
                 System.Threading.Thread.Sleep(400); 
 
-                string currentClip = TextService.GetClipboardText();
+                string currentClip = TextService.GetClipboardText() ?? "";
 
-                if (!string.IsNullOrWhiteSpace(currentClip))
+                // ÖNEMLİ: Sadece gerçekten yeni metin seçildiğinde menüyü göster
+                // Eğer clipboard içeriği değişmediyse, metin seçilmemiştir
+                if (!string.IsNullOrWhiteSpace(currentClip) && currentClip != _lastClipboardText)
                 {
-                    // ActionHandler.ShowNotification?.Invoke("Seçim Algılandı", "Menü açılıyor...", "#3498db");
                     OnTextSelected?.Invoke(pos);
-                }
-                else 
-                {
-                    // ActionHandler.ShowNotification?.Invoke("Bilgi", "Kopyalama başarısız, metin bulunamadı.", "#f1c40f");
                 }
             } 
             catch (Exception ex)
