@@ -93,7 +93,22 @@ namespace YaziciCS
         private void SetupTrayIcon()
         {
             _notifyIcon = new NotifyIcon();
-            _notifyIcon.Icon = SystemIcons.Information; // Fallback icon, ideally load a .ico
+            try
+            {
+                string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+                if (System.IO.File.Exists(iconPath))
+                {
+                    _notifyIcon.Icon = new Icon(iconPath);
+                }
+                else
+                {
+                    _notifyIcon.Icon = SystemIcons.Information;
+                }
+            }
+            catch
+            {
+                _notifyIcon.Icon = SystemIcons.Information;
+            }
             _notifyIcon.Text = SettingsManager.Current.ProgramName;
             _notifyIcon.Visible = true;
 
