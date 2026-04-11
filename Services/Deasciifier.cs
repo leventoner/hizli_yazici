@@ -1,160 +1,249 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace YaziciCS.Services
 {
-    public static class Deasciifier
+    /// <summary>
+    /// Turkish Deasciifier - converts ASCII-only Turkish text to proper Turkish characters.
+    /// Port of mintlemon's DeasciifierBuiltin which is based on Deniz Yüret's turkish-mode algorithm.
+    /// Uses context-based pattern matching with 13,463 patterns across 6 Turkish characters.
+    /// </summary>
+    public class Deasciifier
     {
-        // Simple word-based mapping for very common errors
-        private static readonly Dictionary<string, string> CommonWords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        private const int ContextSize = 10;
+
+        private string asciiString;
+        private string convertedString;
+
+        private static readonly Dictionary<string, string> TurkishAsciifyTable = new Dictionary<string, string>
         {
-            {"merhum", "merhum"},
-            {"umit", "ümit"},
-            {"yazdigim", "yazdığım"},
-            {"yazi", "yazı"},
-            {"usttekini", "üsttekini"},
-            {"nasil", "nasıl"},
-            {"kizdirdiysa", "kızdırdıysa"},
-            {"gelip", "gelip"},
-            {"yazmis", "yazmış"},
-            {"kizim", "kızım"},
-            {"senin", "senin"},
-            {"hocanin", "hocanın"},
-            {"kocanin", "kocanın"},
-            {"babanin", "babanın"},
-            {"arkadasi", "arkadaşı"},
-            {"degilim", "değilim"},
-            {"birak", "bırak"},
-            {"muptelasi", "müptelası"},
-            {"ergenliginden", "ergenliğinden"},
-            {"dusmanim", "düşmanım"},
-            {"olmayi", "olmayı"},
-            {"oyle", "öyle"},
-            {"kiymetli", "kıymetli"},
-            {"umarim", "umarım"},
-            {"basarilar", "başarılar"},
-            {"gormek", "görmek"},
-            {"calismalar", "çalışmalar"},
-            {"tesekkur", "teşekkür"},
-            {"simdi", "şimdi"},
-            {"cok", "çok"},
-            {"is", "iş"},
-            {"icin", "için"},
-            {"birsey", "bir şey"},
-            {"hersey", "her şey"},
-            {"ornek", "örnek"},
-            {"gun", "gün"},
-            {"guzel", "güzel"},
-            {"bugun", "bugün"},
-            {"aksam", "akşam"},
-            {"oglen", "öğlen"},
-            {"ogleden", "öğleden"},
-            {"merhaba", "merhaba"},
-            {"ulasmak", "ulaşmak"},
-            {"yapmak", "yapmak"},
-            {"ediyoruz", "ediyoruz"},
-            {"tesekkurler", "teşekkürler"},
-            {"lutfen", "lütfen"},
-            {"donus", "dönüş"}
+            {"ç", "c"}, {"Ç", "C"},
+            {"ğ", "g"}, {"Ğ", "G"},
+            {"ö", "o"}, {"Ö", "O"},
+            {"ü", "u"}, {"Ü", "U"},
+            {"ı", "i"}, {"İ", "I"},
+            {"ş", "s"}, {"Ş", "S"}
         };
 
-        // Heuristic rules for common Turkish patterns
-        private static readonly List<(string Pattern, string Replacement)> SuffixRules = new List<(string, string)>
+        private static readonly Dictionary<string, string> TurkishToggleAccentTable = new Dictionary<string, string>
         {
-            (@"([a-z])digim\b", "$1dığım"),
-            (@"([a-z])digin\b", "$1dığın"),
-            (@"([a-z])digi\b", "$1dığı"),
-            (@"([a-z])digimiz\b", "$1dığımız"),
-            (@"([a-z])diginiz\b", "$1dığınız"),
-            (@"([a-z])diklari\b", "$1dıkları"),
-            (@"([a-z])acagim\b", "$1acağım"),
-            (@"([a-z])acaksin\b", "$1acaksın"),
-            (@"([a-z])acak\b", "$1acak"),
-            (@"\bkiz([a-z]*)\b", "kız$1"),
-            (@"\byazi([a-z]*)\b", "yazı$1"),
-            (@"\bhoca([a-z]+)in\b", "hoca$1ın"),
-            (@"\bkoca([a-z]+)in\b", "koca$1ın"),
-            (@"\bbaba([a-z]+)in\b", "baba$1ın"),
-            (@"\barkadas([a-z]*)\b", "arkadaş$1"),
-            (@"\bdegil([a-z]*)\b", "değil$1"),
-            (@"\bmusait\b", "müsait"),
-            (@"\bolmayi\b", "olmayı"),
-            (@"\bergenliginden\b", "ergenliğinden"),
-            (@"\bdusmanim\b", "düşmanım")
+            // ASCII -> Turkish
+            {"c", "ç"}, {"C", "Ç"},
+            {"g", "ğ"}, {"G", "Ğ"},
+            {"o", "ö"}, {"O", "Ö"},
+            {"u", "ü"}, {"U", "Ü"},
+            {"i", "ı"}, {"I", "İ"},
+            {"s", "ş"}, {"S", "Ş"},
+            // Turkish -> ASCII
+            {"ç", "c"}, {"Ç", "C"},
+            {"ğ", "g"}, {"Ğ", "G"},
+            {"ö", "o"}, {"Ö", "O"},
+            {"ü", "u"}, {"Ü", "U"},
+            {"ı", "i"}, {"İ", "I"},
+            {"ş", "s"}, {"Ş", "S"}
         };
 
+        private static readonly Dictionary<string, string> TurkishDowncaseAsciifyTable;
+        private static readonly Dictionary<string, string> TurkishUpcaseAccentsTable;
+
+        static Deasciifier()
+        {
+            // Build downcase asciify table
+            TurkishDowncaseAsciifyTable = new Dictionary<string, string>();
+            for (char ch = 'A'; ch <= 'Z'; ch++)
+            {
+                string upper = ch.ToString();
+                string lower = char.ToLowerInvariant(ch).ToString();
+                TurkishDowncaseAsciifyTable[upper] = lower;
+                TurkishDowncaseAsciifyTable[lower] = lower;
+            }
+            TurkishDowncaseAsciifyTable["ç"] = "c";
+            TurkishDowncaseAsciifyTable["Ç"] = "c";
+            TurkishDowncaseAsciifyTable["ğ"] = "g";
+            TurkishDowncaseAsciifyTable["Ğ"] = "g";
+            TurkishDowncaseAsciifyTable["ö"] = "o";
+            TurkishDowncaseAsciifyTable["Ö"] = "o";
+            TurkishDowncaseAsciifyTable["ü"] = "u";
+            TurkishDowncaseAsciifyTable["Ü"] = "u";
+            TurkishDowncaseAsciifyTable["ı"] = "i";
+            TurkishDowncaseAsciifyTable["İ"] = "i";
+            TurkishDowncaseAsciifyTable["ş"] = "s";
+            TurkishDowncaseAsciifyTable["Ş"] = "s";
+
+            // Build upcase accents table
+            TurkishUpcaseAccentsTable = new Dictionary<string, string>();
+            for (char ch = 'A'; ch <= 'Z'; ch++)
+            {
+                string upper = ch.ToString();
+                string lower = char.ToLowerInvariant(ch).ToString();
+                TurkishUpcaseAccentsTable[upper] = lower;
+                TurkishUpcaseAccentsTable[lower] = lower;
+            }
+            TurkishUpcaseAccentsTable["ç"] = "C";
+            TurkishUpcaseAccentsTable["Ç"] = "C";
+            TurkishUpcaseAccentsTable["ğ"] = "G";
+            TurkishUpcaseAccentsTable["Ğ"] = "G";
+            TurkishUpcaseAccentsTable["ö"] = "O";
+            TurkishUpcaseAccentsTable["Ö"] = "O";
+            TurkishUpcaseAccentsTable["ü"] = "U";
+            TurkishUpcaseAccentsTable["Ü"] = "U";
+            TurkishUpcaseAccentsTable["ı"] = "I";
+            TurkishUpcaseAccentsTable["İ"] = "I";
+            TurkishUpcaseAccentsTable["ş"] = "S";
+            TurkishUpcaseAccentsTable["Ş"] = "S";
+        }
+
+        /// <summary>
+        /// Static convenience method matching the old API.
+        /// </summary>
         public static string Deasciify(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-
-            string result = text;
-
-            // 1. Dictionary-based whole word replacement
-            string wordPattern = @"\b[A-Za-zçğıöşüÇĞİÖŞÜ]+\b";
-            result = Regex.Replace(result, wordPattern, match =>
-            {
-                string word = match.Value;
-                string wordLower = word.ToLowerInvariant();
-
-                if (CommonWords.ContainsKey(wordLower))
-                {
-                    return MatchCase(word, CommonWords[wordLower]);
-                }
-                return word;
-            });
-
-            // 2. Rule-based suffix/pattern replacement
-            foreach (var rule in SuffixRules)
-            {
-                result = Regex.Replace(result, rule.Pattern, match => 
-                {
-                    string replaced = Regex.Replace(match.Value, rule.Pattern, rule.Replacement);
-                    return MatchCase(match.Value, replaced);
-                }, RegexOptions.IgnoreCase);
-            }
-
-            // 3. Final Heuristic Pass for missing characters (Aggressive for Turkish-specific letters)
-            // This is a safety net for words not in dictionary or rules.
-            // We target common isolated letters like 'muptelasi' -> 'müptelası'
-            result = Regex.Replace(result, @"\b[A-Za-zçğıöşüÇĞİÖŞÜ]+\b", match => 
-            {
-                string w = match.Value;
-                string wLower = w.ToLowerInvariant();
-                
-                // If it's already Corrected, skip
-                // Custom check for known leftovers
-                if (wLower == "muptelasi") return MatchCase(w, "müptelası");
-                if (wLower == "birak") return MatchCase(w, "bırak");
-                
-                return w;
-            });
-
-            return result;
+            var instance = new Deasciifier(text);
+            return instance.ConvertToTurkish();
         }
 
-        private static string MatchCase(string original, string corrected)
+        public Deasciifier(string input)
         {
-            if (string.IsNullOrEmpty(original) || string.IsNullOrEmpty(corrected)) return corrected;
+            this.asciiString = input;
+            this.convertedString = input;
+        }
 
-            if (char.IsUpper(original[0]))
+        public string ConvertToTurkish()
+        {
+            for (int index = 0; index < convertedString.Length; index++)
             {
-                if (original.Length > 1 && char.IsUpper(original[1]))
+                string ch = convertedString[index].ToString();
+                if (TurkishNeedCorrection(ch, index))
                 {
-                    // UPPERCASE
-                    return corrected.ToUpperInvariant();
+                    convertedString = SetCharAt(convertedString, index, TurkishToggleAccent(ch));
+                }
+                // If no correction needed, character stays as is
+            }
+            return convertedString;
+        }
+
+        private static string SetCharAt(string str, int pos, string c)
+        {
+            return string.Concat(str.AsSpan(0, pos), c.AsSpan(), str.AsSpan(pos + 1));
+        }
+
+        private static string TurkishToggleAccent(string c)
+        {
+            return TurkishToggleAccentTable.TryGetValue(c, out string result) ? result : c;
+        }
+
+        private bool TurkishNeedCorrection(string ch, int point)
+        {
+            string tr = TurkishAsciifyTable.TryGetValue(ch, out string ascii) ? ascii : ch;
+            string trLower = tr.ToLowerInvariant();
+
+            bool m = false;
+            if (TurkishPatternTable.Table.TryGetValue(trLower, out var pl))
+            {
+                m = TurkishMatchPattern(pl, point);
+            }
+
+            if (tr == "I")
+            {
+                return ch == tr ? !m : m;
+            }
+            else
+            {
+                return ch == tr ? m : !m;
+            }
+        }
+
+        private bool TurkishMatchPattern(Dictionary<string, int> dlist, int point)
+        {
+            int rank = 2 * dlist.Count;
+            string context = TurkishGetContext(ContextSize, point);
+
+            int start = 0;
+            int contextLen = context.Length;
+
+            while (start <= ContextSize)
+            {
+                int end = 1 + ContextSize;
+                while (end <= contextLen)
+                {
+                    string s = context.Substring(start, end - start);
+                    if (dlist.TryGetValue(s, out int r))
+                    {
+                        if (Math.Abs(r) < Math.Abs(rank))
+                        {
+                            rank = r;
+                        }
+                    }
+                    end++;
+                }
+                start++;
+            }
+
+            return rank > 0;
+        }
+
+        private string TurkishGetContext(int size, int point)
+        {
+            // Build context string: spaces with 'X' in the middle
+            char[] s = new char[1 + (2 * size)];
+            for (int j = 0; j < s.Length; j++) s[j] = ' ';
+            s[size] = 'X';
+
+            int i = size + 1;
+            bool space = false;
+            int index = point + 1;
+
+            // Build right context (characters after current position)
+            while (i < s.Length && !space && index < asciiString.Length)
+            {
+                string currentChar = convertedString[index].ToString();
+                if (TurkishDowncaseAsciifyTable.TryGetValue(currentChar, out string x))
+                {
+                    s[i] = x[0];
+                    i++;
+                    space = false;
                 }
                 else
                 {
-                    // Title Case
-                    if (corrected.Length > 1)
-                        return char.ToUpperInvariant(corrected[0]) + corrected.Substring(1).ToLowerInvariant();
-                    else 
-                        return corrected.ToUpperInvariant();
+                    if (!space)
+                    {
+                        i++;
+                        space = true;
+                    }
                 }
+                index++;
             }
-            return corrected; // lowercase
+
+            // Trim right side
+            int rightEnd = i;
+
+            // Build left context (characters before current position)
+            index = point - 1;
+            i = size - 1;
+            space = false;
+
+            while (i >= 0 && index >= 0)
+            {
+                string currentChar = convertedString[index].ToString();
+                if (TurkishUpcaseAccentsTable.TryGetValue(currentChar, out string x))
+                {
+                    s[i] = x[0];
+                    i--;
+                    space = false;
+                }
+                else
+                {
+                    if (!space)
+                    {
+                        i--;
+                        space = true;
+                    }
+                }
+                index--;
+            }
+
+            return new string(s, 0, rightEnd);
         }
     }
 }
