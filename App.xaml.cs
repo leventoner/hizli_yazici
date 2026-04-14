@@ -208,9 +208,9 @@ namespace YaziciCS
             _activeMenu = new FloatingMenu(new System.Windows.Point(x, y), SettingsManager.Current.ColorTheme, SettingsManager.Current.FloatingMenuDuration);
             _activeMenu.OnActionSelected = async (action) =>
             {
-                if (action == "fix") await ActionHandler.HandleFixClipboardAsync();
-                else if (action == "improve_tr") await ActionHandler.HandleImproveClipboardAsync(false);
-                else if (action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync(true);
+                if (action == "fix") await ActionHandler.HandleFixClipboardAsync(true);
+                else if (action == "improve_tr") await ActionHandler.HandleImproveClipboardAsync(false, true);
+                else if (action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync(true, true);
             };
             _activeMenu.Show();
         }

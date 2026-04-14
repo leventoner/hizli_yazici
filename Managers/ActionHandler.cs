@@ -10,8 +10,29 @@ namespace YaziciCS.Managers
     {
         public static Action<string, string, string> ShowNotification { get; set; }
 
-        public static async Task HandleFixClipboardAsync()
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+
+        private const byte VK_CONTROL = 0x11;
+        private const byte VK_C = 0x43;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+
+        private static async Task SimulateCtrlC()
         {
+            keybd_event(VK_CONTROL, 0, 0, 0);
+            keybd_event(VK_C, 0, 0, 0);
+            keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+            await Task.Delay(400); // OS'un kopyalama işlemini bitirmesi için süre
+        }
+
+        public static async Task HandleFixClipboardAsync(bool triggerCopy = false)
+        {
+            if (triggerCopy)
+            {
+                await SimulateCtrlC();
+            }
+
             string text = TextService.GetClipboardText();
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -32,8 +53,13 @@ namespace YaziciCS.Managers
             }
         }
 
-        public static async Task HandleImproveClipboardAsync(bool autoDetect)
+        public static async Task HandleImproveClipboardAsync(bool autoDetect, bool triggerCopy = false)
         {
+            if (triggerCopy)
+            {
+                await SimulateCtrlC();
+            }
+
             string text = TextService.GetClipboardText();
             if (string.IsNullOrWhiteSpace(text))
             {

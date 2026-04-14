@@ -12,7 +12,7 @@ namespace YaziciCS.Managers
         private System.Windows.Point _mouseDownPos;
         private DateTime _lastUpTime = DateTime.MinValue;
         private int _clickCount = 0;
-        private string _lastClipboardText = "";
+
         
         public Action<System.Windows.Point> OnTextSelected { get; set; }
         public Action OnClickOutside { get; set; }
@@ -48,8 +48,7 @@ namespace YaziciCS.Managers
 
             _mouseDownPos = currentPos;
 
-            // Her tıklamada clipboard içeriğini kaydet (çift tıklama veya sürükleme sonrası metin seçildiğinde karşılaştırmak için)
-            _lastClipboardText = TextService.GetClipboardText() ?? "";
+
         }
 
         private void MouseHook_OnLeftButtonUp(int x, int y)
@@ -77,34 +76,13 @@ namespace YaziciCS.Managers
             }
         }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
-
-        private const byte VK_CONTROL = 0x11;
-        private const byte VK_C = 0x43;
-        private const uint KEYEVENTF_KEYUP = 0x0002;
 
         private void CheckAndTriggerMenu(System.Windows.Point pos)
         {
             try 
             {
-                // Simulate Ctrl+C to copy selected text
-                keybd_event(VK_CONTROL, 0, 0, 0);
-                keybd_event(VK_C, 0, 0, 0);
-                keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0);
-                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
-
-                // Give OS time to finish selection
-                System.Threading.Thread.Sleep(400); 
-
-                string currentClip = TextService.GetClipboardText() ?? "";
-
-                // ÖNEMLİ: Sadece gerçekten yeni metin seçildiğinde menüyü göster
-                // Eğer clipboard içeriği değişmediyse, metin seçilmemiştir
-                if (!string.IsNullOrWhiteSpace(currentClip) && currentClip != _lastClipboardText)
-                {
-                    OnTextSelected?.Invoke(pos);
-                }
+                // Artık burada otomatik Ctrl+C göndermiyoruz. Böylece kullanıcının panosu sadece işlem yapıldığında değişir.
+                OnTextSelected?.Invoke(pos);
             } 
             catch (Exception ex)
             {
