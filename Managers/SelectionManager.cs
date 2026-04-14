@@ -81,6 +81,15 @@ namespace YaziciCS.Managers
         {
             try 
             {
+                // UIAutomation kullanarak panoyu bozmadan seçili metni okumaya çalış
+                string tempText = PeekSelectedTextViaUIAutomation();
+
+                // Eğer başarıyla okuduysak ve sadece boşluk/boş metin ise, menüyü gösterme
+                if (tempText != null && string.IsNullOrWhiteSpace(tempText))
+                {
+                    return; // Kullanıcı sadece boşluk seçmiş, menüyü çıkarma
+                }
+
                 // Artık burada otomatik Ctrl+C göndermiyoruz. Böylece kullanıcının panosu sadece işlem yapıldığında değişir.
                 OnTextSelected?.Invoke(pos);
             } 
@@ -88,6 +97,30 @@ namespace YaziciCS.Managers
             {
                 ActionHandler.ShowNotification?.Invoke("Hata", "Seçim Hatası: " + ex.Message, "#e74c3c");
             }
+        }
+
+        private string PeekSelectedTextViaUIAutomation()
+        {
+            try
+            {
+                var focusedElement = System.Windows.Automation.AutomationElement.FocusedElement;
+                if (focusedElement != null)
+                {
+                    if (focusedElement.TryGetCurrentPattern(System.Windows.Automation.TextPattern.Pattern, out object patternObj))
+                    {
+                        var textPattern = (System.Windows.Automation.TextPattern)patternObj;
+                        var selections = textPattern.GetSelection();
+                        if (selections != null && selections.Length > 0)
+                        {
+                            return selections[0].GetText(-1);
+                        }
+                    }
+                }
+            }
+            catch 
+            { 
+            }
+            return null; // Okunamıyorsa null dön, eski mantıkla devam etsin (menü çıksın)
         }
     }
 }
