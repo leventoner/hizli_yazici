@@ -40,7 +40,7 @@ namespace YaziciCS.Services
         private const uint CF_UNICODETEXT = 13;
         private const uint GMEM_MOVEABLE = 2;
 
-        public static string GetClipboardText()
+        public static async Task<string> GetClipboardTextAsync()
         {
             // Retry loop for OpenClipboard
             for (int i = 0; i < 15; i++)
@@ -63,12 +63,12 @@ namespace YaziciCS.Services
                     }
                     finally { CloseClipboard(); }
                 }
-                System.Threading.Thread.Sleep(50);
+                await Task.Delay(50);
             }
             return "";
         }
 
-        public static void SetClipboardText(string text)
+        public static async Task SetClipboardTextAsync(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
 
@@ -86,7 +86,7 @@ namespace YaziciCS.Services
                     }
                     finally { CloseClipboard(); }
                 }
-                System.Threading.Thread.Sleep(50);
+                await Task.Delay(50);
             }
         }
 

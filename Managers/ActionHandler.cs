@@ -33,7 +33,7 @@ namespace YaziciCS.Managers
                 await SimulateCtrlC();
             }
 
-            string text = TextService.GetClipboardText();
+            string text = await TextService.GetClipboardTextAsync();
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
@@ -44,7 +44,7 @@ namespace YaziciCS.Managers
 
             if (text.Trim() != corrected.Trim())
             {
-                TextService.SetClipboardText(corrected);
+                await TextService.SetClipboardTextAsync(corrected);
                 ShowNotification?.Invoke("Karakterler Düzeltildi!", corrected, "#2ecc71");
             }
             else if (SettingsManager.Current.NotifyOnNoChange)
@@ -60,7 +60,7 @@ namespace YaziciCS.Managers
                 await SimulateCtrlC();
             }
 
-            string text = TextService.GetClipboardText();
+            string text = await TextService.GetClipboardTextAsync();
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
@@ -74,7 +74,7 @@ namespace YaziciCS.Managers
 
             if (!string.IsNullOrEmpty(improved) && !improved.StartsWith("Hata:"))
             {
-                TextService.SetClipboardText(improved);
+                await TextService.SetClipboardTextAsync(improved);
                 string title = autoDetect ? "Dilde İyileştirildi!" : "Yazı İyileştirildi!";
                 ShowNotification?.Invoke(title, improved, "#9b59b6");
             }

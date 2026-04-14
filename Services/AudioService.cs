@@ -8,6 +8,8 @@ namespace YaziciCS.Services
 {
     public static class AudioService
     {
+        private static readonly System.Net.Http.HttpClient SharedClient = new System.Net.Http.HttpClient();
+
         [DllImport("winmm.dll", EntryPoint = "mciSendStringA", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
         private static extern int mciSendString(string lpstrCommand, StringBuilder lpstrReturnString, int uReturnLength, IntPtr hwndCallback);
 
@@ -69,11 +71,9 @@ namespace YaziciCS.Services
                 string base64Audio = Convert.ToBase64String(audioData);
                 string lastError = "Henüz hiçbir model denenmedi.";
 
-                using (var client = new System.Net.Http.HttpClient())
+                foreach (var modelResourceName in prioritized)
                 {
-                    foreach (var modelResourceName in prioritized)
-                    {
-                        LogDebug($"Trying model: {modelResourceName}");
+                    LogDebug($"Trying model: {modelResourceName}");
                         string uri = $"https://generativelanguage.googleapis.com/v1beta/{modelResourceName}:generateContent?key={apiKey}";
 
                         var requestBody = new
@@ -96,7 +96,7 @@ namespace YaziciCS.Services
                             string jsonBody = System.Text.Json.JsonSerializer.Serialize(requestBody);
                             var content = new System.Net.Http.StringContent(jsonBody, Encoding.UTF8, "application/json");
 
-                            var response = await client.PostAsync(uri, content);
+                            var response = await SharedClient.PostAsync(uri, content);
                             string respText = await response.Content.ReadAsStringAsync();
 
                             if (response.IsSuccessStatusCode)
@@ -124,7 +124,6 @@ namespace YaziciCS.Services
                             LogDebug($"EXCEPTION {modelResourceName}: {ex.Message}");
                         }
                     }
-                }
                 return $"Ses anlaşılamadı.\n\nAyrıntılar için stt_debug.txt dosyasına bakın.\n\nSon Hata: {lastError}";
             }
             catch (Exception ex)
