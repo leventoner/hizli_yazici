@@ -114,13 +114,34 @@ namespace YaziciCS.Managers
                         {
                             return selections[0].GetText(-1);
                         }
+                        return ""; // TextPattern destekliyor ancak seçim yok, menüyü engelle
+                    }
+                    else
+                    {
+                        // TextPattern desteklemeyen ögeler (ör. Klasör içi boşluklar)
+                        var type = focusedElement.Current.ControlType;
+                        if (type == System.Windows.Automation.ControlType.List ||
+                            type == System.Windows.Automation.ControlType.ListItem ||
+                            type == System.Windows.Automation.ControlType.Pane ||
+                            type == System.Windows.Automation.ControlType.Window ||
+                            type == System.Windows.Automation.ControlType.Tree ||
+                            type == System.Windows.Automation.ControlType.TreeItem ||
+                            type == System.Windows.Automation.ControlType.Button ||
+                            type == System.Windows.Automation.ControlType.DataGrid ||
+                            type == System.Windows.Automation.ControlType.Table ||
+                            type == System.Windows.Automation.ControlType.Thumb ||
+                            type == System.Windows.Automation.ControlType.ScrollBar ||
+                            type == System.Windows.Automation.ControlType.Header)
+                        {
+                            return ""; // Menünün açılmasını engeller
+                        }
                     }
                 }
             }
             catch 
             { 
             }
-            return null; // Okunamıyorsa null dön, eski mantıkla devam etsin (menü çıksın)
+            return null; // Bilinmeyen durumda null dön, eski mantıkla devam etsin (menü çıkma ihtimali)
         }
     }
 }
