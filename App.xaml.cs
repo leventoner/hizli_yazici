@@ -22,9 +22,29 @@ namespace YaziciCS
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Beklenmedik kapanmalarin izini surmek icin oturum baslangicini logla
+            // ve cozulemeyen istisnalari (UI thread disinda da) yakala.
+            CrashLogger.LogSessionStart();
+
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+            {
+                CrashLogger.Log("AppDomain.UnhandledException", args.ExceptionObject as Exception);
+            };
+
+            TaskScheduler.UnobservedTaskException += (s, args) =>
+            {
+                CrashLogger.Log("TaskScheduler.UnobservedTaskException", args.Exception);
+                args.SetObserved();
+            };
+
+            // Pencilere dayalı kapanma modu: son pencere kapanınca uygulama KAPANMAZ,
+            // sistem tepsisinde çalışmaya devam eder. Shutdown() çağrılana kadar yaşar.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
             // Global error handling
             DispatcherUnhandledException += (s, args) => 
             {
+                CrashLogger.Log("DispatcherUnhandledException", args.Exception);
                 ActionHandler.ShowNotification?.Invoke("Hata", args.Exception.Message, "#e74c3c");
                 args.Handled = true;
             };
@@ -35,6 +55,16 @@ namespace YaziciCS
             {
                 Width = 0, Height = 0, WindowStyle = WindowStyle.None,
                 ShowInTaskbar = false, ShowActivated = false
+            };
+            // Gizli pencere kapanırsa uygulama kapanmasın diye referansı koruyoruz.
+            _hiddenWindow.Closing += (s, args) =>
+            {
+                if (ShutdownMode != ShutdownMode.OnExplicitShutdown)
+                {
+                    // Beklenmedik bir Close çağrısı (ör. kullanıcı X'e bastı) -> engelle.
+                    CrashLogger.Log("HiddenWindow.Close engellendi", null);
+                    args.Cancel = true;
+                }
             };
             _hiddenWindow.Show(); _hiddenWindow.Hide();
 
@@ -60,14 +90,20 @@ namespace YaziciCS
                 {
                     if (System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control))
                     {
-                        Dispatcher.Invoke(async () => await RunMultipleClickLogic());
+                        // Dikkat: Hook callback icinde dispatcher'a senkron (Invoke) beklemek,
+                        // UI megulsa tum sistemi (biz dahil) kilitler ve Windows hook'u
+                        // timeout ile dusurur. Bu yuzden fire-and-forget (BeginInvoke) kullan.
+                        Dispatcher.BeginInvoke(new Action(async () => await RunMultipleClickLogic()));
                     }
                 }
             };
 
             _selectionManager = new SelectionManager();
-            _selectionManager.OnTextSelected = (pos) => Dispatcher.Invoke(() => ShowFloatingMenu(pos));
-            _selectionManager.OnClickOutside = () => Dispatcher.Invoke(CloseActiveMenu);
+            // Hook callback thread'inden dispatcher'a senkron Invoke yerine BeginInvoke
+            // kullan: hook callback'ini bloklamak sistem genelinde klavye/fare
+            // gecikmesine ve hook'un Windows tarafindan dusurulmesine yol acar.
+            _selectionManager.OnTextSelected = (pos, selectedText) => Dispatcher.BeginInvoke(new Action(() => ShowFloatingMenu(pos, selectedText)));
+            _selectionManager.OnClickOutside = () => Dispatcher.BeginInvoke(new Action(CloseActiveMenu));
             _selectionManager.IsClickOnMenu = IsClickOnMenu;
 
             ActionHandler.ShowNotification = (title, msg, color) => Dispatcher.Invoke(() =>
@@ -189,7 +225,7 @@ namespace YaziciCS
             }
         }
 
-        private void ShowFloatingMenu(System.Windows.Point pos)
+        private void ShowFloatingMenu(System.Windows.Point pos, string selectedText = null)
         {
             CloseActiveMenu();
             
@@ -208,9 +244,16 @@ namespace YaziciCS
             _activeMenu = new FloatingMenu(new System.Windows.Point(x, y), SettingsManager.Current.ColorTheme, SettingsManager.Current.FloatingMenuDuration);
             _activeMenu.OnActionSelected = async (action) =>
             {
-                if (action == "fix") await ActionHandler.HandleFixClipboardAsync(true);
-                else if (action == "improve_tr") await ActionHandler.HandleImproveClipboardAsync(false, true);
-                else if (action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync(true, true);
+                // Menüyü açtığımız anda seçili metni (UIAutomation ile) okumuştuk.
+                // Pano üzerinden değil, doğrudan bu metni kullanarak işlem yap.
+                if (!string.IsNullOrWhiteSpace(selectedText))
+                {
+                    await TextService.SetClipboardTextAsync(selectedText);
+                }
+
+                if (action == "fix") await ActionHandler.HandleFixClipboardAsync();
+                else if (action == "improve_tr") await ActionHandler.HandleImproveClipboardAsync(false);
+                else if (action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync(true);
             };
             _activeMenu.Show();
         }
@@ -247,11 +290,15 @@ namespace YaziciCS
 
         private void Application_Exit(object sender, ExitEventArgs e)
         {
+            // Neden kapandığını logla (beklenmedik kapanmaları tespit için).
+            CrashLogger.Log("Application_Exit çagrildi", null);
+
             if (_notifyIcon != null)
             {
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
             }
+            _keyboardHook?.Dispose();
             _hotkeyManager?.Dispose();
         }
     }

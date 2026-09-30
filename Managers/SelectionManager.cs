@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -14,7 +15,7 @@ namespace YaziciCS.Managers
         private int _clickCount = 0;
 
         
-        public Action<System.Windows.Point> OnTextSelected { get; set; }
+        public Action<System.Windows.Point, string> OnTextSelected { get; set; }
         public Action OnClickOutside { get; set; }
 
         // We check UI active menu by callback or static
@@ -63,6 +64,13 @@ namespace YaziciCS.Managers
                 isDragging = true;
             }
 
+            // Sürüklemeye başlama eşiğini aşan tıklamalarda çift/tık sayısını sıfırla,
+            // böylece sürükle-bırak sonrası yanlışlıkla çift tık mantığı çalışmaz.
+            if (isDragging)
+            {
+                _clickCount = 0;
+            }
+
             if (_clickCount >= 2 || isDragging)
             {
                 // Delay slightly to let OS select the text
@@ -82,16 +90,23 @@ namespace YaziciCS.Managers
             try 
             {
                 // UIAutomation kullanarak panoyu bozmadan seçili metni okumaya çalış
-                string tempText = PeekSelectedTextViaUIAutomation();
+                string selectedText = PeekSelectedTextViaUIAutomation();
 
-                // Eğer başarıyla okuduysak ve sadece boşluk/boş metin ise, menüyü gösterme
-                if (tempText != null && string.IsNullOrWhiteSpace(tempText))
+                // TextPattern desteklenmeyen ya da bilinmeyen bir durum:
+                // Kanıtlanmış en az 2 karakterlik bir seçim olmadan menüyü ASLA açma.
+                if (selectedText == null)
                 {
-                    return; // Kullanıcı sadece boşluk seçmiş, menüyü çıkarma
+                    return;
+                }
+
+                // En az 2 karakterlik (harf/rakam içeren) bir seçim olmadan menüyü açma.
+                if (!HasMeaningfulSelection(selectedText))
+                {
+                    return;
                 }
 
                 // Artık burada otomatik Ctrl+C göndermiyoruz. Böylece kullanıcının panosu sadece işlem yapıldığında değişir.
-                OnTextSelected?.Invoke(pos);
+                OnTextSelected?.Invoke(pos, selectedText);
             } 
             catch (Exception ex)
             {
@@ -99,7 +114,40 @@ namespace YaziciCS.Managers
             }
         }
 
+        /// <summary>
+        /// Seçim menünün açılmasını gerektirecek kadar anlamlı mı?
+        /// En az 2 karakter olmalı ve en az 2 harf/rakam içermeli.
+        /// </summary>
+        private static bool HasMeaningfulSelection(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            string trimmed = text.Trim();
+            if (trimmed.Length < 2) return false;
+
+            int letterOrDigitCount = trimmed.Count(char.IsLetterOrDigit);
+            return letterOrDigitCount >= 2;
+        }
+
         private string PeekSelectedTextViaUIAutomation()
+        {
+            try
+            {
+                // Mouse hook callback thread'inde runspace bulunmaz; STA dispatcher thread'inde oku.
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.CheckAccess())
+                {
+                    return dispatcher.Invoke(() => PeekSelectedTextViaUIAutomationCore());
+                }
+                return PeekSelectedTextViaUIAutomationCore();
+            }
+            catch 
+            { 
+            }
+            return null; // Bilinmeyen durumda null dön, menü açılmaz.
+        }
+
+        private string PeekSelectedTextViaUIAutomationCore()
         {
             try
             {
@@ -112,7 +160,13 @@ namespace YaziciCS.Managers
                         var selections = textPattern.GetSelection();
                         if (selections != null && selections.Length > 0)
                         {
-                            return selections[0].GetText(-1);
+                            // Birden fazla seçim range'i varsa hepsini birleştir.
+                            string combined = string.Concat(selections.Select(safe =>
+                            {
+                                try { return safe.GetText(-1) ?? ""; }
+                                catch { return ""; }
+                            }));
+                            return combined;
                         }
                         return ""; // TextPattern destekliyor ancak seçim yok, menüyü engelle
                     }
@@ -141,7 +195,7 @@ namespace YaziciCS.Managers
             catch 
             { 
             }
-            return null; // Bilinmeyen durumda null dön, eski mantıkla devam etsin (menü çıkma ihtimali)
+            return null; // Bilinmeyen durumda null dön, menü açılmaz.
         }
     }
 }

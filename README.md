@@ -75,9 +75,20 @@ GEMINI_API_KEY=your_api_key_here
 
 > Not: `.env.example` dosyasını `.env` olarak kopyalayıp API anahtarınızı girin.
 
-### Sistem Tayı
+### Sistem Tepsisi
 
-Ayarlar için sistem tepsisindeki ikona sağ tıklayıp "Ayarlar"ı seçebilirsiniz.
+Uygulama sistem tepsisinde (sağ alt köşe) bir simge ile çalışır. Ayarlar için sistem tepsisindeki ikona sağ tıklayıp "Ayarlar"ı seçebilirsiniz.
+
+### Ayar Dosyası (settings.json)
+
+Ayarlar, uygulamanın çalıştığı klasörde otomatik olarak `settings.json` dosyasına kaydedilir. Önemli varsayılanlar:
+
+| Ayar | Varsayılan | Açıklama |
+|---|---|---|
+| `SttHotkey` | `ctrl+shift+y` | Sesle yazma (STT) global kısayolu |
+| `SttDuration` | `10` | Kayıt süresi (saniye) |
+| `FloatingMenuDuration` | `10` | Yüzer menünün görünür kalma süresi (saniye) |
+| `ColorTheme` | `#3d5afe` | Yüzer menü renk teması |
 
 ## 📁 Proje Yapısı
 
@@ -90,7 +101,7 @@ hizli_yazici/
 ├── nuget.config                 # NuGet yapılandırması
 ├── .env.example                 # Environment değişkenleri şablonu
 ├── icon.ico                     # Uygulama ikonu
-├── icon.png                     # Uygulama ikonu (PNG)
+├── dummy.cs                     # UIAutomation referans testi (geçici yardımcı)
 │
 ├── Managers/                    # Yönetici sınıfları
 │   ├── ActionHandler.cs         # Eylem işleyici
@@ -113,19 +124,16 @@ hizli_yazici/
 │   ├── NotificationWindow.xaml.cs
 │   ├── SettingsWindow.xaml      # Ayarlar penceresi
 │   └── SettingsWindow.xaml.cs
-│
-└── publish/                     # Yayınlanmış dosyalar
-    ├── HizliYazici.exe          # Ana uygulama
-    ├── HizliYazici.dll         # Uygulama kütüphanesi
-    └── *.dll                    # Bağımlılıklar
 ```
+
+> **Not:** `publish/` klasörü yalnızca `dotnet publish` çalıştırıldığında oluşturulur ve versiyon takibi yapılmaz.
 
 ## 🔧 Teknolojiler
 
 - **Framework**: .NET 8 / WPF
 - **Programlama Dili**: C#
-- **AI Servisi**: Google Gemini API
-- **Ses Tanıma**: Windows Speech Recognition
+- **AI Servisi**: Google Gemini API (metin iyileştirme ve ses tanıma için kullanılır)
+- **Ses Kaydı**: Windows `winmm.dll` (mciSendString) ile mikrofon kaydı; ses dosyası transkripsiyon için Gemini API'ye gönderilir
 
 ## 📝 Lisans
 
