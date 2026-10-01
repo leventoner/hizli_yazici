@@ -94,6 +94,71 @@ namespace YaziciCS.Services
         public static bool DiscoveryAttempted = false;
         private static string _lastSuccessfulModel = ""; // Cache for the working model
 
+        // Shared Gemini call: tries models in priority order (last successful first,
+        // then flash models, then pro models) and returns the model output text.
+        private static async Task<string> CallGeminiAsync(string prompt, string originalText)
+        {
+            if (string.IsNullOrWhiteSpace(prompt)) return originalText;
+
+            string apiKey = SettingsManager.Current.GeminiApiKey;
+            if (string.IsNullOrEmpty(apiKey)) return "Hata: GEMINI_API_KEY bulunamadı.";
+
+            if (!DiscoveryAttempted) await DiscoverModelsAsync(apiKey);
+
+            var prioritized = new System.Collections.Generic.List<string>();
+            if (!string.IsNullOrEmpty(_lastSuccessfulModel)) prioritized.Add(_lastSuccessfulModel);
+            foreach (var m in AvailableModels) if (m.Contains("flash") && !m.Contains("experimental") && !prioritized.Contains(m)) prioritized.Add(m);
+            foreach (var m in AvailableModels) if (m.Contains("pro") && !m.Contains("experimental") && !prioritized.Contains(m)) prioritized.Add(m);
+            foreach (var m in AvailableModels) if (!prioritized.Contains(m)) prioritized.Add(m);
+
+            if (prioritized.Count == 0) prioritized.AddRange(new[] { "models/gemini-1.5-flash", "models/gemini-pro" });
+            if (prioritized.Count > 10) prioritized = prioritized.GetRange(0, 10);
+
+            LogDebug($"İşlem başlatıldı. Denenecek model sayısı: {prioritized.Count}");
+            string lastError = "Henüz hiçbir model denenmedi.";
+
+            foreach (var modelResourceName in prioritized)
+            {
+                LogDebug($"Deneniyor: {modelResourceName}");
+                string uri = $"https://generativelanguage.googleapis.com/v1beta/{modelResourceName}:generateContent?key={apiKey}";
+                var requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
+
+                try
+                {
+                    int timeoutSec = modelResourceName.Contains("flash") || modelResourceName == _lastSuccessfulModel ? 8 : 15;
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec));
+
+                    var response = await HttpClient.PostAsync(uri, new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"), cts.Token);
+                    string responseString = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using (JsonDocument doc = JsonDocument.Parse(responseString))
+                        {
+                            var textObj = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text");
+                            _lastSuccessfulModel = modelResourceName;
+                            LogDebug($"BAŞARILI: {modelResourceName}");
+                            return textObj.GetString()?.Trim() ?? originalText;
+                        }
+                    }
+                    else
+                    {
+                        lastError = $"{modelResourceName}: {response.StatusCode}\n{responseString}";
+                        LogDebug($"HATA ({modelResourceName}): {response.StatusCode} - {responseString}");
+                        if (modelResourceName == _lastSuccessfulModel) _lastSuccessfulModel = "";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lastError = $"{modelResourceName} İstisna: {ex.Message}";
+                    LogDebug($"İSTİSNA ({modelResourceName}): {ex.Message}");
+                }
+            }
+
+            return $"Hiçbir model yanıt vermedi.\n\nAyrıntılar için ana dizindeki ai_debug.txt dosyasına bakın.\n\nSon Hata:\n{lastError}";
+        }
+
+
         public static async Task DiscoverModelsAsync(string apiKey)
         {
             if (DiscoveryAttempted) return;
@@ -165,70 +230,30 @@ namespace YaziciCS.Services
             catch { }
         }
 
-        public static async Task<string> ImproveTextAsync(string text, bool autoDetectLanguage = false)
+        public static async Task<string> ImproveTextAsync(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-            
-            string apiKey = SettingsManager.Current.GeminiApiKey;
-            if (string.IsNullOrEmpty(apiKey)) return "Hata: GEMINI_API_KEY bulunamadı.";
 
-            if (!DiscoveryAttempted) await DiscoverModelsAsync(apiKey);
+            string prompt = "You are a professional text editor. Analyze the language of the following text. " +
+                "Improve its grammar, spelling, punctuation, word order, and general flow while STRICTLY preserving its original language and meaning. " +
+                "Do NOT translate it. Return ONLY the improved text without explanations, notes, intros, or markdown quotes.\n\n" +
+                $"Text:\n\"\"\"\n{text}\n\"\"\"";
 
-            string prompt = autoDetectLanguage 
-                ? $"Improve the grammar, spelling, word order, and general flow of the following text in its original language. Return only the corrected text. Text: {text}"
-                : $"Aşağıdaki Türkçe metni dilbilgisi, imla, kelime sırası ve genel akıcılık açısından iyileştir. Sadece düzeltilmiş metni döndür. Metin: {text}";
+            return await CallGeminiAsync(prompt, text);
+        }
 
-            var prioritized = new System.Collections.Generic.List<string>();
-            if (!string.IsNullOrEmpty(_lastSuccessfulModel)) prioritized.Add(_lastSuccessfulModel);
-            foreach (var m in AvailableModels) if (m.Contains("flash") && !m.Contains("experimental") && !prioritized.Contains(m)) prioritized.Add(m);
-            foreach (var m in AvailableModels) if (m.Contains("pro") && !m.Contains("experimental") && !prioritized.Contains(m)) prioritized.Add(m);
-            foreach (var m in AvailableModels) if (!prioritized.Contains(m)) prioritized.Add(m);
+        // Çeviri özelliği: Metin Türkçe ise İngilizceye, diğer dillerdeyse Türkçeye çevirir.
+        public static async Task<string> TranslateTextAsync(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text;
 
-            if (prioritized.Count == 0) prioritized.AddRange(new[] { "models/gemini-1.5-flash", "models/gemini-pro" });
-            if (prioritized.Count > 10) prioritized = prioritized.GetRange(0, 10);
+            string prompt = $"You are a translator. Analyze the language of the text between triple quotes below.\n" +
+                "- If the text is in Turkish, translate it into natural, fluent English.\n" +
+                "- If the text is in any other language (e.g. German, English, Chinese, French, Russian, etc.), translate it into natural, fluent Turkish.\n" +
+                "Rules: Preserve the original meaning, tone and line breaks. Do not add explanations, notes or quotes. Return ONLY the translated text.\n" +
+                $"Text:\n\"\"\"\n{text}\n\"\"\"";
 
-            LogDebug($"İşlem başlatıldı. Denenecek model sayısı: {prioritized.Count}");
-            string lastError = "Henüz hiçbir model denenmedi.";
-
-            foreach (var modelResourceName in prioritized)
-            {
-                LogDebug($"Deneniyor: {modelResourceName}");
-                string uri = $"https://generativelanguage.googleapis.com/v1beta/{modelResourceName}:generateContent?key={apiKey}";
-                var requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
-                
-                try
-                {
-                    int timeoutSec = modelResourceName.Contains("flash") || modelResourceName == _lastSuccessfulModel ? 8 : 15;
-                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec));
-                    
-                    var response = await HttpClient.PostAsync(uri, new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"), cts.Token);
-                    string responseString = await response.Content.ReadAsStringAsync();
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        using (JsonDocument doc = JsonDocument.Parse(responseString))
-                        {
-                            var textObj = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text");
-                            _lastSuccessfulModel = modelResourceName;
-                            LogDebug($"BAŞARILI: {modelResourceName}");
-                            return textObj.GetString()?.Trim() ?? text;
-                        }
-                    }
-                    else
-                    {
-                        lastError = $"{modelResourceName}: {response.StatusCode}\n{responseString}";
-                        LogDebug($"HATA ({modelResourceName}): {response.StatusCode} - {responseString}");
-                        if (modelResourceName == _lastSuccessfulModel) _lastSuccessfulModel = "";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    lastError = $"{modelResourceName} İstisna: {ex.Message}";
-                    LogDebug($"İSTİSNA ({modelResourceName}): {ex.Message}");
-                }
-            }
-
-            return $"Hiçbir model yanıt vermedi.\n\nAyrıntılar için ana dizindeki ai_debug.txt dosyasına bakın.\n\nSon Hata:\n{lastError}";
+            return await CallGeminiAsync(prompt, text);
         }
     }
 }

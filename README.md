@@ -8,6 +8,7 @@ Windows işletim sistemi için geliştirilmiş, global kısayollar ve yapay zeka
 - **🪄 AI İyileştirme**: Google Gemini API kullanarak metni dilbilgisi ve akıcılık açısından optimize eder.
 - **🗣️ Sesle Yazma (STT)**: Mikrofonunuzdan aldığınız sesi anında metne çevirir.
 - **🖱️ Yüzer Menü**: Herhangi bir uygulamada metin seçtiğinizde anında beliren hızlı işlem menüsü.
+- **🌐 Akıllı Çeviri**: Seçili metin Türkçe ise İngilizceye, başka bir dildeyse (Almanca, İngilizce, Çince vb.) Türkçeye Gemini API ile otomatik çevirir.
 - **⚙️ Tray Entegrasyonu**: Sistem tepsisinden kolay erişim ve ayar yönetimi.
 
 ## 🖥️ Sistem Gereksinimleri

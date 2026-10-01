@@ -53,7 +53,7 @@ namespace YaziciCS.Managers
             }
         }
 
-        public static async Task HandleImproveClipboardAsync(bool autoDetect, bool triggerCopy = false)
+        public static async Task HandleImproveClipboardAsync(bool triggerCopy = false)
         {
             if (triggerCopy)
             {
@@ -67,20 +67,47 @@ namespace YaziciCS.Managers
                 return;
             }
 
-            string statusMsg = autoDetect ? "Metin kendi dilinde iyileştiriliyor..." : "Metin yapay zeka ile iyileştiriliyor...";
-            ShowNotification?.Invoke("İşleniyor...", statusMsg, "#9b59b6");
+            ShowNotification?.Invoke("İşleniyor...", "Metin yapay zeka ile iyileştiriliyor...", "#9b59b6");
 
-            string improved = await TextService.ImproveTextAsync(text, autoDetect);
+            string improved = await TextService.ImproveTextAsync(text);
 
-            if (!string.IsNullOrEmpty(improved) && !improved.StartsWith("Hata:"))
+            if (!string.IsNullOrEmpty(improved) && !improved.StartsWith("Hata:") && !improved.StartsWith("Hiçbir model"))
             {
                 await TextService.SetClipboardTextAsync(improved);
-                string title = autoDetect ? "Dilde İyileştirildi!" : "Yazı İyileştirildi!";
-                ShowNotification?.Invoke(title, improved, "#9b59b6");
+                ShowNotification?.Invoke("Metin İyileştirildi!", improved, "#9b59b6");
             }
             else
             {
                 ShowNotification?.Invoke("İşlem Başarısız", improved, "#e74c3c");
+            }
+        }
+
+        public static async Task HandleTranslateClipboardAsync(bool triggerCopy = false)
+        {
+            if (triggerCopy)
+            {
+                await SimulateCtrlC();
+            }
+
+            string text = await TextService.GetClipboardTextAsync();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
+                return;
+            }
+
+            ShowNotification?.Invoke("İşleniyor...", "Metin çevriliyor...", "#16a085");
+
+            string translated = await TextService.TranslateTextAsync(text);
+
+            if (!string.IsNullOrEmpty(translated) && !translated.StartsWith("Hata:") && !translated.StartsWith("Hiçbir model"))
+            {
+                await TextService.SetClipboardTextAsync(translated);
+                ShowNotification?.Invoke("Çeviri Tamamlandı!", translated, "#16a085");
+            }
+            else
+            {
+                ShowNotification?.Invoke("İşlem Başarısız", translated, "#e74c3c");
             }
         }
 

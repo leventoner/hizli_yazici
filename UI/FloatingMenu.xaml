@@ -1,7 +1,7 @@
 <Window x:Class="YaziciCS.UI.FloatingMenu"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FloatingMenu" Height="50" Width="150"
+        Title="FloatingMenu" Height="48" Width="144"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="True"
         Opacity="0" Loaded="Window_Loaded">
@@ -11,10 +11,11 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontSize" Value="18"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -42,7 +43,7 @@
         </Style>
     </Window.Resources>
     
-    <Border CornerRadius="10" BorderThickness="1" Padding="5">
+    <Border CornerRadius="10" BorderThickness="1" Padding="6,4">
         <Border.BorderBrush>
             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                 <GradientStop Color="{Binding ThemeColor.Color}" Offset="0"/>
@@ -60,9 +61,39 @@
         </Border.Effect>
         
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Button x:Name="BtnFix" Content="🔠" Style="{StaticResource MenuButtonStyle}" ToolTip="Karakter Düzelt" Click="BtnFix_Click"/>
-            <Button x:Name="BtnImproveTr" Content="🇹🇷" Style="{StaticResource MenuButtonStyle}" ToolTip="Türkçe İyileştir" Click="BtnImproveTr_Click"/>
-            <Button x:Name="BtnImproveAuto" Content="OR" Style="{StaticResource MenuButtonStyle}" ToolTip="Orijinal Dilde İyileştir" Click="BtnImproveAuto_Click"/>
+            <!-- Karakter Düzelt (Pencil / Edit) -->
+            <Button x:Name="BtnFix" Style="{StaticResource MenuButtonStyle}" ToolTip="Karakter Düzelt (ç, ğ, ı, ö, ş, ü)" Click="BtnFix_Click">
+                <Viewbox Width="17" Height="17">
+                    <Canvas Width="24" Height="24">
+                        <Path Data="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z M15 5l4 4" 
+                              Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                    </Canvas>
+                </Viewbox>
+            </Button>
+
+            <!-- Metni İyileştir (Yapay Zeka Sparkles - Kendi Dilinde) -->
+            <Button x:Name="BtnImprove" Style="{StaticResource MenuButtonStyle}" ToolTip="Metni İyileştir (Kendi Dilinde)" Click="BtnImprove_Click">
+                <Viewbox Width="18" Height="18">
+                    <Canvas Width="24" Height="24">
+                        <Path Data="M10 2 Q10 9 3 10 Q10 11 10 18 Q10 11 17 10 Q10 9 10 2 Z" Fill="#FBBF24"/>
+                        <Path Data="M18 13 Q18 16.5 14.5 17 Q18 17.5 18 21 Q18 17.5 21.5 17 Q18 16.5 18 13 Z" Fill="#FDE68A"/>
+                    </Canvas>
+                </Viewbox>
+            </Button>
+
+            <!-- Çevir (Globe) -->
+            <Button x:Name="BtnTranslate" Style="{StaticResource MenuButtonStyle}" ToolTip="Çevir (Türkçe ↔ Diğer Dil)" Click="BtnTranslate_Click">
+                <Viewbox Width="17" Height="17">
+                    <Canvas Width="24" Height="24">
+                        <Ellipse Canvas.Left="2" Canvas.Top="2" Width="20" Height="20" 
+                                 Stroke="White" StrokeThickness="1.8"/>
+                        <Path Data="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" 
+                              Stroke="White" StrokeThickness="1.8"/>
+                        <Line X1="2" Y1="12" X2="22" Y2="12" 
+                              Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </Canvas>
+                </Viewbox>
+            </Button>
         </StackPanel>
     </Border>
 </Window>

@@ -70,8 +70,8 @@ namespace YaziciCS.UI
         }
 
         private void BtnFix_Click(object sender, RoutedEventArgs e) => TriggerAction("fix");
-        private void BtnImproveTr_Click(object sender, RoutedEventArgs e) => TriggerAction("improve_tr");
-        private void BtnImproveAuto_Click(object sender, RoutedEventArgs e) => TriggerAction("improve_auto");
+        private void BtnImprove_Click(object sender, RoutedEventArgs e) => TriggerAction("improve");
+        private void BtnTranslate_Click(object sender, RoutedEventArgs e) => TriggerAction("translate");
 
         private void TriggerAction(string action)
         {

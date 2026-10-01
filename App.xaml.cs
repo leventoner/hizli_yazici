@@ -213,13 +213,9 @@ namespace YaziciCS
                 {
                     if (SettingsManager.Current.EnableCharacterFix) await ActionHandler.HandleFixClipboardAsync();
                 }
-                else if (currentClicks == 3)
+                else if (currentClicks >= 3)
                 {
-                    if (SettingsManager.Current.EnableAiImprove) await ActionHandler.HandleImproveClipboardAsync(autoDetect: false);
-                }
-                else if (currentClicks >= 4)
-                {
-                    if (SettingsManager.Current.EnableAiImprove) await ActionHandler.HandleImproveClipboardAsync(autoDetect: true);
+                    if (SettingsManager.Current.EnableAiImprove) await ActionHandler.HandleImproveClipboardAsync();
                 }
                 _clickCount = 0;
             }
@@ -252,8 +248,8 @@ namespace YaziciCS
                 }
 
                 if (action == "fix") await ActionHandler.HandleFixClipboardAsync();
-                else if (action == "improve_tr") await ActionHandler.HandleImproveClipboardAsync(false);
-                else if (action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync(true);
+                else if (action == "improve" || action == "improve_tr" || action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync();
+                else if (action == "translate") await ActionHandler.HandleTranslateClipboardAsync();
             };
             _activeMenu.Show();
         }
