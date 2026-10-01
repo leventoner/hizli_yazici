@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Notification" SizeToContent="Height" Width="320"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False"
         Opacity="0" Loaded="Window_Loaded">
     
     <Border CornerRadius="8" BorderThickness="0" Padding="0" ClipToBounds="True">

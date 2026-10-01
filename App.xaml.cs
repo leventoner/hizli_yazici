@@ -121,8 +121,6 @@ namespace YaziciCS
             else
             {
                 ActionHandler.ShowNotification(SettingsManager.Current.ProgramName, "Yazıcı Başlatıldı ve API anahtarı yüklendi!", SettingsManager.Current.ColorTheme);
-                // Start model discovery in background immediately
-                Task.Run(async () => await TextService.DiscoverModelsAsync(SettingsManager.Current.GeminiApiKey));
             }
         }
 

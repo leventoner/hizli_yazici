@@ -54,26 +54,27 @@ namespace YaziciCS.Services
             string apiKey = Managers.SettingsManager.Current.GeminiApiKey;
             if (string.IsNullOrEmpty(apiKey)) return "Hata: Gemini API anahtarı bulunamadı (.env dosyasını kontrol edin).";
 
-            if (!TextService.DiscoveryAttempted) await TextService.DiscoverModelsAsync(apiKey);
+            var prioritized = TextService.GetPrioritizedModels();
 
-            var prioritized = new System.Collections.Generic.List<string>();
-            foreach (var m in TextService.AvailableModels) if (m.Contains("flash") && !m.Contains("experimental") && !prioritized.Contains(m)) prioritized.Add(m);
-            foreach (var m in TextService.AvailableModels) if (m.Contains("pro") && !m.Contains("experimental") && !prioritized.Contains(m)) prioritized.Add(m);
-            foreach (var m in TextService.AvailableModels) if (!prioritized.Contains(m)) prioritized.Add(m);
-
-            if (prioritized.Count == 0) prioritized.AddRange(new[] { "models/gemini-1.5-flash", "models/gemini-pro" });
-
-            LogDebug($"Transcription started. Models to try: {prioritized.Count}");
+            LogDebug($"Transcription started. Models to try: {prioritized.Count}; retry if all failures are transient.");
 
             try
             {
                 byte[] audioData = File.ReadAllBytes(filePath);
                 string base64Audio = Convert.ToBase64String(audioData);
                 string lastError = "Henüz hiçbir model denenmedi.";
+                bool dailyQuotaReached = false;
 
-                foreach (var modelResourceName in prioritized)
+                int pass = 1;
+                while (true)
                 {
-                    LogDebug($"Trying model: {modelResourceName}");
+                    bool allFailuresRetryable = true;
+                    TimeSpan retryDelay = TextService.GetModelRetryDelay(pass);
+                    LogDebug($"Model round {pass} started.");
+                    foreach (var modelResourceName in prioritized)
+                    {
+                        LogDebug($"Trying model: {modelResourceName}");
+                        var attemptTimer = System.Diagnostics.Stopwatch.StartNew();
                         string uri = $"https://generativelanguage.googleapis.com/v1beta/{modelResourceName}:generateContent?key={apiKey}";
 
                         var requestBody = new
@@ -95,8 +96,8 @@ namespace YaziciCS.Services
                         {
                             string jsonBody = System.Text.Json.JsonSerializer.Serialize(requestBody);
                             var content = new System.Net.Http.StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-                            var response = await SharedClient.PostAsync(uri, content);
+                            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                            var response = await SharedClient.PostAsync(uri, content, cts.Token);
                             string respText = await response.Content.ReadAsStringAsync();
 
                             if (response.IsSuccessStatusCode)
@@ -107,23 +108,51 @@ namespace YaziciCS.Services
                                     if (root.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                                     {
                                         var text = candidates[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+                                        TextService.LogModelAttempt("speech-transcription", modelResourceName, "success", attemptTimer.ElapsedMilliseconds);
                                         LogDebug($"SUCCESS with {modelResourceName}");
                                         return text?.Trim() ?? "Ses anlaşılamadı.";
                                     }
                                 }
+
+                                allFailuresRetryable = false;
+                                lastError = $"{modelResourceName}: API boş yanıt döndürdü.";
+                                TextService.LogModelAttempt("speech-transcription", modelResourceName, "empty-response", attemptTimer.ElapsedMilliseconds);
                             }
                             else
                             {
+                                bool dailyQuotaExceeded = TextService.IsDailyQuotaExceeded(respText);
+                                bool retryable = TextService.IsRetryableModelFailure((int)response.StatusCode, null, respText);
+                                dailyQuotaReached |= dailyQuotaExceeded;
+                                allFailuresRetryable &= retryable;
+                                if (retryable)
+                                {
+                                    TimeSpan modelRetryDelay = TextService.GetModelRetryDelay(respText, pass);
+                                    if (modelRetryDelay > retryDelay) retryDelay = modelRetryDelay;
+                                }
                                 lastError = $"{modelResourceName}: {response.StatusCode} - {respText}";
+                                TextService.LogModelAttempt("speech-transcription", modelResourceName, dailyQuotaExceeded ? "quota-exhausted" : $"http-{(int)response.StatusCode}", attemptTimer.ElapsedMilliseconds);
                                 LogDebug($"FAILED {modelResourceName}: {lastError}");
                             }
                         }
                         catch (Exception ex)
                         {
+                            bool retryable = TextService.IsRetryableModelFailure(null, ex);
+                            allFailuresRetryable &= retryable;
                             lastError = $"{modelResourceName} İstisna: {ex.Message}";
+                            TextService.LogModelAttempt("speech-transcription", modelResourceName, ex is OperationCanceledException ? "timeout" : retryable ? "network-error" : "exception", attemptTimer.ElapsedMilliseconds);
                             LogDebug($"EXCEPTION {modelResourceName}: {ex.Message}");
                         }
                     }
+
+                    if (!allFailuresRetryable) break;
+
+                    pass++;
+                    LogDebug($"All four models returned transient failures. Retrying in {retryDelay.TotalSeconds:0} seconds in the same order.");
+                    await Task.Delay(retryDelay);
+                }
+                if (dailyQuotaReached)
+                    return "Hata: Gemini günlük ücretsiz istek kotası dolmuş. Kota yenilenince tekrar deneyin veya Google AI Studio'da ücretlendirmeyi kontrol edin.";
+
                 return $"Ses anlaşılamadı.\n\nAyrıntılar için stt_debug.txt dosyasına bakın.\n\nSon Hata: {lastError}";
             }
             catch (Exception ex)

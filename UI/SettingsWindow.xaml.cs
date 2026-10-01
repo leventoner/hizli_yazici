@@ -24,7 +24,9 @@ namespace YaziciCS.UI
                 EnableAiImprove = SettingsManager.Current.EnableAiImprove,
                 EnableSpeechToText = SettingsManager.Current.EnableSpeechToText,
                 ColorTheme = SettingsManager.Current.ColorTheme,
-                FloatingMenuDuration = SettingsManager.Current.FloatingMenuDuration
+                FloatingMenuDuration = SettingsManager.Current.FloatingMenuDuration,
+                TranslationProvider = SettingsManager.Current.TranslationProvider,
+                TranslationEmail = SettingsManager.Current.TranslationEmail
             };
             
             this.DataContext = this;
@@ -48,6 +50,8 @@ namespace YaziciCS.UI
             SettingsManager.Current.EnableSpeechToText = Current.EnableSpeechToText;
             SettingsManager.Current.ColorTheme = Current.ColorTheme;
             SettingsManager.Current.FloatingMenuDuration = Current.FloatingMenuDuration;
+            SettingsManager.Current.TranslationProvider = Current.TranslationProvider;
+            SettingsManager.Current.TranslationEmail = Current.TranslationEmail;
 
             SettingsManager.Save();
             

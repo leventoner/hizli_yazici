@@ -35,6 +35,7 @@ appsettings.json
 *.tmp
 *.temp
 *.cache
+model_usage.txt
 
 ## OS
 Thumbs.db

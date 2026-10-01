@@ -133,34 +133,8 @@ namespace YaziciCS.Managers
 
                 if (!string.IsNullOrEmpty(transcribed) && !transcribed.StartsWith("Hata") && !transcribed.StartsWith("API Hatası") && !transcribed.StartsWith("Bağlantı") && !transcribed.StartsWith("Ses anlaşılamadı"))
                 {
-                    // Python project waits 0.5s before writing
-                    await Task.Delay(500);
-
-                    // Use a safer typing method. SendKeys.SendWait can fail with certain characters.
-                    // SendKeys.Send(string) is often more reliable for plain text.
-                    // Also, we escape special SendKeys characters { } [ ] ( ) + ^ % ~
-                    string escapedTranscribed = transcribed
-                        .Replace("{", "{{}")
-                        .Replace("}", "{}}")
-                        .Replace("[", "{[}")
-                        .Replace("]", "{]}")
-                        .Replace("(", "{(}")
-                        .Replace(")", "{)}")
-                        .Replace("+", "{+}")
-                        .Replace("^", "{^}")
-                        .Replace("%", "{%}")
-                        .Replace("~", "{~}");
-
-                    try 
-                    {
-                        System.Windows.Forms.SendKeys.SendWait(escapedTranscribed);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("SendKeys error: " + ex.Message);
-                    }
-                    
-                    ShowNotification?.Invoke("Başarılı!", $"Yazıya Geçirildi: {transcribed}", "#2ecc71");
+                    await TextService.SetClipboardTextAsync(transcribed);
+                    ShowNotification?.Invoke("Panoya Kopyalandı!", transcribed, "#2ecc71");
                 }
                 else
                 {

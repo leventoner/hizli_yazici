@@ -39,7 +39,16 @@ namespace YaziciCS.Managers
 
         [JsonPropertyName("floating_menu_duration")]
         public int FloatingMenuDuration { get; set; } = 10;
-        
+
+        // Çeviri sağlayıcısı: "free" (API anahtarsız) veya "gemini" (API anahtarı gerekir)
+        [JsonPropertyName("translation_provider")]
+        public string TranslationProvider { get; set; } = "free";
+
+        // MyMemory için isteğe bağlı e-posta. Verilirse anonim günlük limit
+        // 5.000 karakterden 50.000 karaktere çıkar. Boş bırakılabilir.
+        [JsonPropertyName("translation_email")]
+        public string TranslationEmail { get; set; } = "";
+
         [JsonIgnore]
         public string GeminiApiKey { get; set; } = "";
     }
