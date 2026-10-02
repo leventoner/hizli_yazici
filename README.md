@@ -1,141 +1,122 @@
-# Hızlı Yazıcı - C# Metin Asistanı
+# Hızlı Yazıcı
 
-Windows işletim sistemi için geliştirilmiş, global kısayollar ve yapay zeka desteği ile metin düzeltme/iyileştirme sağlayan bir masaüstü uygulamasıdır.
+Hızlı Yazıcı, Windows'ta seçtiğiniz metni düzeltmenize, iyileştirmenize veya çevirmenize yardımcı olan bir masaüstü uygulamasıdır. Uygulama sistem tepsisinde çalışır; seçili metnin yanında açılan küçük menüden işlem seçebilir veya klavye kısayollarını kullanabilirsiniz.
 
-## 📋 Özellikler
+## Özellikler
 
-- **🔠 Karakter Düzeltme**: Türkçe karakter hatalarını (deasciify) otomatik onarır. Örneğin `guzel` → `güzel`, `sirket` → `şirket` gibi.
-- **🪄 AI İyileştirme**: Google Gemini API kullanarak metni dilbilgisi ve akıcılık açısından optimize eder.
-- **🗣️ Sesle Yazma (STT)**: Mikrofonunuzdan aldığınız sesi anında metne çevirir.
-- **🖱️ Yüzer Menü**: Herhangi bir uygulamada metin seçtiğinizde anında beliren hızlı işlem menüsü.
-- **🌐 Akıllı Çeviri**: Seçili metin Türkçe ise İngilizceye, başka bir dildeyse (Almanca, İngilizce, Çince vb.) Türkçeye Gemini API ile otomatik çevirir.
-- **⚙️ Tray Entegrasyonu**: Sistem tepsisinden kolay erişim ve ayar yönetimi.
+- **Türkçe karakter düzeltme:** `guzel`, `sirket` gibi Türkçe karakterleri eksik yazılmış kelimeleri yerel olarak düzeltmeye çalışır. Bu özellik için internet bağlantısı veya API anahtarı gerekmez.
+- **Metin iyileştirme:** Gemini metnin dilini koruyarak yazım, noktalama, dilbilgisi ve akıcılık üzerinde çalışır. Metin Gemini API'ye gönderilir.
+- **Çeviri:** Türkçe metni İngilizceye, diğer dillerdeki metni Türkçeye çevirir. Varsayılan ücretsiz mod önce Google'ın anahtarsız çeviri uç noktasını, yanıt alınamazsa MyMemory servisini dener. İsterseniz ayarlardan Gemini sağlayıcısını seçebilirsiniz. Kaynak metin seçilen sağlayıcıya gönderilir.
+- **Sesle yazma:** Mikrofon kaydını Gemini'ye göndererek metne dönüştürür. Kayıt süresi ve global kısayol ayarlanabilir. Ses işleme için Gemini API anahtarı ve mikrofon erişimi gerekir.
+- **Yüzer menü ve tepsi:** Metin seçtiğinizde düzeltme, iyileştirme ve çeviri seçenekleri sunan menü açılır. Uygulama tepsi simgesinden ayarlanabilir veya kapatılabilir; ana pencere kapalıyken de tepside çalışmaya devam eder.
 
-## 🖥️ Sistem Gereksinimleri
+## Gereksinimler
 
-- **İşletim Sistemi**: Windows 10 / Windows 11
-- **Runtime**: .NET 8 Runtime (veya self-contained build ile runtime gerekmez)
+- Windows 10 veya Windows 11
+- Geliştirme ve derleme için .NET 8 SDK
+- Framework-dependent yayımlanan uygulamayı çalıştırmak için .NET 8 Desktop Runtime
+- Self-contained yayımlanan uygulama için ayrıca .NET Runtime kurulumu gerekmez (Windows x64 paketi)
 
-## 🚀 Kurulum ve Çalıştırma
+Proje WPF kullanır ve `net8.0-windows` hedefini derler. Self-contained paket yalnızca hedeflediğiniz mimari için kullanılabilir; aşağıdaki örnek Windows x64 içindir.
 
-### 1. Projeyi Çalıştırma (Geliştirme Modu)
+## Geliştirme Modunda Çalıştırma
 
-Projeyi bir terminalde açın ve şu komutu çalıştırın:
+PowerShell'de proje klasörüne geçin. Kendi bilgisayarınızdaki yolu kullanın:
 
 ```powershell
-cd c:\Users\lener\Desktop\code\csharp\hizli_yazici
+cd C:\path\to\hizli_yazici
+dotnet restore
 dotnet run
 ```
 
-### 2. EXE Dosyası Oluşturma
+`dotnet restore`, NuGet bağımlılıklarını indirir; `dotnet run` projeyi derleyip başlatır. Uygulama açıldığında ana pencere yerine sistem tepsisinde çalışır. Uygulamadan çıkmak için tepsi simgesine sağ tıklayıp **Çıkış** seçin.
 
-#### Seçenek A: Self-Contained EXE (Önerilen - Runtime gerekmez)
+## Derleme ve Yayımlama
 
-Bu yöntem .NET Runtime kurulu olmayan bilgisayarlarda da çalışır:
+Komutları proje dosyasının (`YaziciCS.csproj`) bulunduğu klasörde çalıştırın. İlk derlemede gerekli paketler otomatik geri yüklenir; ayrıca `dotnet restore` çalıştırmak da mümkündür.
 
-```powershell
-dotnet restore --force
-dotnet publish -c Release -r win-x64 --self-contained true -o ./publish
-```
-
-> **Not:** İlk çalıştırmada `dotnet restore --force` komutu nuget.config'tan en son runtime paketlerini çeker.
-
-Bu komut `publish/` klasöründe çalıştırılabilir exe dosyalarını oluşturur (~145 MB).
-
-#### Seçenek B: Framework-Dependent EXE (Daha küçük boyut)
-
-Sadece .NET 8 Runtime kurulu bilgisayarlarda çalışır, daha küçük boyutludur:
-
-```powershell
-dotnet publish -c Release -o ./publish
-```
-
-#### Seçenek C: Basit Build
+### Release derlemesi
 
 ```powershell
 dotnet build -c Release
 ```
 
-Bu komut `bin/Release/net8.0-windows/` klasöründe dll ve exe oluşturur.
+Bu, uygulamayı Release yapılandırmasında derler. Çıktı `bin\Release\net8.0-windows\` altındadır. Bu klasördeki uygulama .NET Desktop Runtime gerektirir; başkasına dağıtmak için aşağıdaki publish seçeneklerinden birini tercih edin.
 
-### 3. Oluşturulan EXE'yi Çalıştırma
+### Framework-dependent publish
 
-1. `publish/HizliYazici.exe` dosyasını çalıştırın.
-2. Uygulama sistem tepsisinde (sağ alt köşe) bir simge ile görünür.
-3. Herhangi bir metin seçtiğinizde yüzer menü belirir.
+Daha küçük bir dağıtım üretir, ancak hedef bilgisayarda .NET 8 Desktop Runtime kurulu olmalıdır:
 
-## ⚙️ Yapılandırma
+```powershell
+dotnet publish -c Release -o .\publish\framework-dependent
+```
 
-### API Anahtarı Ayarlama
+Uygulamayı `publish\framework-dependent\HizliYazici.exe` ile başlatın. Dağıtırken yalnızca `.exe` dosyasını değil, bu çıktı klasörünün **tamamını** paylaşın.
 
-`.env` dosyasına Gemini API anahtarınızı eklemeyi unutmayın:
+### Self-contained Windows x64 publish
+
+Hedef bilgisayara ayrıca .NET Runtime kurmadan çalıştırmak için:
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true -o .\publish\win-x64
+```
+
+Bu seçenek .NET çalışma zamanını da pakete eklediğinden daha büyük çıktı üretir; boyut kullanılan SDK ve bağımlılık sürümlerine göre değişir. Uygulamayı `publish\win-x64\HizliYazici.exe` ile başlatın ve dağıtırken `publish\win-x64\` klasörünün **tamamını** paylaşın. Bu paket Windows x64 içindir.
+
+İki publish seçeneği farklı klasörlere çıktı verir; böylece önceki paketten kalan dosyalar yeni çıktıyla karışmaz. `publish/`, `bin/` ve `obj/` klasörleri Git tarafından takip edilmez.
+
+## Yapılandırma
+
+### Gemini API anahtarı
+
+Gemini API anahtarı; metin iyileştirme, sesle yazma ve Gemini ile çeviri için gereklidir. Varsayılan ücretsiz çeviri ve yerel Türkçe karakter düzeltme için anahtar gerekmez.
+
+Uygulamanın çalıştığı klasöre `.env` adlı bir metin dosyası oluşturup anahtarı şu biçimde ekleyin:
 
 ```text
-GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=anahtariniz
 ```
 
-> Not: `.env.example` dosyasını `.env` olarak kopyalayıp API anahtarınızı girin.
+Geliştirme sırasında `.env` dosyasını proje köküne koyabilirsiniz. Yayımlanmış uygulamada en kolay yöntem dosyayı `HizliYazici.exe` ile aynı klasöre koymaktır. `.env` dosyası gizli bilgi içerdiğinden kaynak kontrolüne eklemeyin.
 
-### Sistem Tepsisi
+### Ayarlar
 
-Uygulama sistem tepsisinde (sağ alt köşe) bir simge ile çalışır. Ayarlar için sistem tepsisindeki ikona sağ tıklayıp "Ayarlar"ı seçebilirsiniz.
+Ayarlar penceresine tepsi menüsünden ulaşabilirsiniz. Değerler uygulamanın çalıştığı klasördeki `settings.json` dosyasına kaydedilir; dosya ilk çalıştırmada yoksa varsayılanlarla oluşturulur. JSON'daki alan adları küçük harfli ve alt çizgilidir:
 
-### Ayar Dosyası (settings.json)
-
-Ayarlar, uygulamanın çalıştığı klasörde otomatik olarak `settings.json` dosyasına kaydedilir. Önemli varsayılanlar:
-
-| Ayar | Varsayılan | Açıklama |
+| JSON alanı | Varsayılan | Açıklama |
 |---|---|---|
-| `SttHotkey` | `ctrl+shift+y` | Sesle yazma (STT) global kısayolu |
-| `SttDuration` | `10` | Kayıt süresi (saniye) |
-| `FloatingMenuDuration` | `10` | Yüzer menünün görünür kalma süresi (saniye) |
-| `ColorTheme` | `#3d5afe` | Yüzer menü renk teması |
+| `stt_hotkey` | `ctrl+shift+y` | Sesle yazma global kısayolu |
+| `stt_duration` | `10` | Mikrofon kayıt süresi (saniye) |
+| `cooldown` | `0.5` | Ctrl+C ile tetiklenen çoklu tıklama algılama aralığı (saniye) |
+| `enable_character_fix` | `true` | Karakter düzeltme özelliği |
+| `enable_ai_improve` | `true` | AI ile metin iyileştirme özelliği |
+| `enable_speech_to_text` | `true` | Sesle yazma özelliği |
+| `notify_on_no_change` | `true` | Düzeltme değişiklik yapmadığında bildirim gösterme |
+| `floating_menu_duration` | `10` | Yüzer menünün ekranda kalma süresi (saniye) |
+| `color_theme` | `#3d5afe` | Menü ve bildirimlerde kullanılan tema rengi |
+| `translation_provider` | `free` | `free` veya `gemini`; Gemini seçeneği API anahtarı gerektirir |
+| `translation_email` | boş | MyMemory için isteğe bağlı e-posta adresi |
 
-## 📁 Proje Yapısı
+Ücretsiz çeviri sağlayıcısı metnin dilini otomatik algılamayı dener ve hedef dili Türkçe/İngilizce olarak belirler. Google isteği başarısız olursa MyMemory yedek olarak kullanılır. Ayarlara bir e-posta girilmesi MyMemory'nin anonim kullanım limitini artırabilir; bu bilgi MyMemory'nin kendi limitlerine tabidir.
 
-```
+## Proje Yapısı
+
+```text
 hizli_yazici/
-├── App.xaml                    # WPF Application tanımı
-├── App.xaml.cs                  # Uygulama giriş noktası
-├── AssemblyInfo.cs              # Assembly metadata
-├── YaziciCS.csproj              # Proje dosyası
-├── nuget.config                 # NuGet yapılandırması
-├── .env.example                 # Environment değişkenleri şablonu
-├── icon.ico                     # Uygulama ikonu
-├── dummy.cs                     # UIAutomation referans testi (geçici yardımcı)
-│
-├── Managers/                    # Yönetici sınıfları
-│   ├── ActionHandler.cs         # Eylem işleyici
-│   ├── GlobalHotkeyManager.cs   # Global kısayol yöneticisi
-│   ├── GlobalKeyboardHook.cs    # Klavye dinleyici
-│   ├── GlobalMouseHook.cs       # Fare dinleyici
-│   ├── SelectionManager.cs      # Metin seçim yöneticisi
-│   └── SettingsManager.cs       # Ayarlar yöneticisi
-│
-├── Services/                    # Servis sınıfları
-│   ├── AudioService.cs          # Ses kayıt servisi (STT)
-│   ├── Deasciifier.cs           # Türkçe karakter düzeltici
-│   ├── TextService.cs           # Metin işleme servisi
-│   └── TurkishPatternTable.cs   # Türkçe karakter kalıpları
-│
-├── UI/                          # Kullanıcı arayüzü
-│   ├── FloatingMenu.xaml        # Yüzer menü tasarımı
-│   ├── FloatingMenu.xaml.cs     # Yüzer menü kodları
-│   ├── NotificationWindow.xaml # Bildirim penceresi
-│   ├── NotificationWindow.xaml.cs
-│   ├── SettingsWindow.xaml      # Ayarlar penceresi
-│   └── SettingsWindow.xaml.cs
+├── App.xaml, App.xaml.cs       # WPF uygulaması ve başlangıç akışı
+├── YaziciCS.csproj             # .NET hedefi ve proje ayarları
+├── Managers/                   # Kısayollar, seçim, ayarlar ve eylem yönetimi
+├── Services/                   # Metin, ses ve çeviri servisleri
+└── UI/                         # Yüzer menü, bildirim ve ayarlar pencereleri
 ```
 
-> **Not:** `publish/` klasörü yalnızca `dotnet publish` çalıştırıldığında oluşturulur ve versiyon takibi yapılmaz.
+## Teknolojiler
 
-## 🔧 Teknolojiler
+- C#, .NET 8 ve WPF
+- Google Gemini API: metin iyileştirme, ses transkripsiyonu ve isteğe bağlı çeviri
+- Ücretsiz çeviri: Google'ın anahtarsız çeviri uç noktası ve MyMemory yedeği
+- Ses kaydı: Windows `winmm.dll` (`mciSendString`)
 
-- **Framework**: .NET 8 / WPF
-- **Programlama Dili**: C#
-- **AI Servisi**: Google Gemini API (metin iyileştirme ve ses tanıma için kullanılır)
-- **Ses Kaydı**: Windows `winmm.dll` (mciSendString) ile mikrofon kaydı; ses dosyası transkripsiyon için Gemini API'ye gönderilir
-
-## 📝 Lisans
+## Lisans
 
 Bu proje eğitim amaçlı geliştirilmiştir.
