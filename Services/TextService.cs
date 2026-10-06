@@ -313,26 +313,32 @@ namespace YaziciCS.Services
             return await CallGeminiAsync(prompt, text);
         }
 
-        // Çeviri özelliği: Metin Türkçe ise İngilizceye, diğer dillerdeyse Türkçeye çevirir.
+        // Çeviri özelliği: Metin Türkçe ise hedef yabancı dile (varsayılan İngilizce),
+        // yabancı dildeyse Türkçeye çevirir.
         // Ayarlardaki translation_provider "free" ise API anahtarı gerektirmeyen ücretsiz
         // servisler (Google keyless + MyMemory) kullanılır; "gemini" ise Gemini API kullanılır.
-        public static async Task<string> TranslateTextAsync(string text)
+        public static async Task<string> TranslateTextAsync(string text, string targetLanguage = "en")
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
+
+            bool isFrench = targetLanguage.Equals("fr", StringComparison.OrdinalIgnoreCase);
 
             string provider = SettingsManager.Current.TranslationProvider ?? "free";
             if (provider.Equals("free", StringComparison.OrdinalIgnoreCase))
             {
-                return await FreeTranslationService.TranslateAsync(text);
+                return await FreeTranslationService.TranslateAsync(text, isFrench ? "fr" : "en");
             }
 
+            string targetLangName = isFrench ? "French" : "English";
             string prompt = $"You are a translator. Analyze the language of the text between triple quotes below.\n" +
-                "- If the text is in Turkish, translate it into natural, fluent English.\n" +
-                "- If the text is in any other language (e.g. German, English, Chinese, French, Russian, etc.), translate it into natural, fluent Turkish.\n" +
+                $"- If the text is in Turkish, translate it into natural, fluent {targetLangName}.\n" +
+                $"- If the text is in {targetLangName} (or any other language), translate it into natural, fluent Turkish.\n" +
                 "Rules: Preserve the original meaning, tone and line breaks. Do not add explanations, notes or quotes. Return ONLY the translated text.\n" +
                 $"Text:\n\"\"\"\n{text}\n\"\"\"";
 
             return await CallGeminiAsync(prompt, text);
         }
+
+        public static Task<string> TranslateFrenchTextAsync(string text) => TranslateTextAsync(text, "fr");
     }
 }

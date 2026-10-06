@@ -230,7 +230,7 @@ namespace YaziciCS
             double x = pos.X;
             double y = pos.Y + 10;
             
-            if (x + 150 > screenWidth) x = screenWidth - 160;
+            if (x + 190 > screenWidth) x = screenWidth - 200;
             if (y + 60 > screenHeight) y = pos.Y - 60;
             if (x < 0) x = 10;
             if (y < 0) y = 10;
@@ -247,7 +247,8 @@ namespace YaziciCS
 
                 if (action == "fix") await ActionHandler.HandleFixClipboardAsync();
                 else if (action == "improve" || action == "improve_tr" || action == "improve_auto") await ActionHandler.HandleImproveClipboardAsync();
-                else if (action == "translate") await ActionHandler.HandleTranslateClipboardAsync();
+                else if (action == "translate" || action == "translate_en") await ActionHandler.HandleTranslateClipboardAsync();
+                else if (action == "translate_fr") await ActionHandler.HandleTranslateFrenchClipboardAsync();
             };
             _activeMenu.Show();
         }

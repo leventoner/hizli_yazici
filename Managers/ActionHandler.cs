@@ -96,14 +96,43 @@ namespace YaziciCS.Managers
                 return;
             }
 
-            ShowNotification?.Invoke("İşleniyor...", "Metin çevriliyor...", "#16a085");
+            ShowNotification?.Invoke("İşleniyor...", "Metin çevriliyor (TR ↔ EN)...", "#16a085");
 
-            string translated = await TextService.TranslateTextAsync(text);
+            string translated = await TextService.TranslateTextAsync(text, "en");
 
             if (!string.IsNullOrEmpty(translated) && !translated.StartsWith("Hata:") && !translated.StartsWith("Hiçbir model"))
             {
                 await TextService.SetClipboardTextAsync(translated);
-                ShowNotification?.Invoke("Çeviri Tamamlandı!", translated, "#16a085");
+                ShowNotification?.Invoke("Çeviri Tamamlandı! (EN)", translated, "#16a085");
+            }
+            else
+            {
+                ShowNotification?.Invoke("İşlem Başarısız", translated, "#e74c3c");
+            }
+        }
+
+        public static async Task HandleTranslateFrenchClipboardAsync(bool triggerCopy = false)
+        {
+            if (triggerCopy)
+            {
+                await SimulateCtrlC();
+            }
+
+            string text = await TextService.GetClipboardTextAsync();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
+                return;
+            }
+
+            ShowNotification?.Invoke("İşleniyor...", "Metin çevriliyor (TR ↔ FR)...", "#16a085");
+
+            string translated = await TextService.TranslateFrenchTextAsync(text);
+
+            if (!string.IsNullOrEmpty(translated) && !translated.StartsWith("Hata:") && !translated.StartsWith("Hiçbir model"))
+            {
+                await TextService.SetClipboardTextAsync(translated);
+                ShowNotification?.Invoke("Çeviri Tamamlandı! (FR)", translated, "#16a085");
             }
             else
             {

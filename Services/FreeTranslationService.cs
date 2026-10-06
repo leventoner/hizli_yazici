@@ -14,25 +14,25 @@ namespace YaziciCS.Services
     /// API anahtarı gerektirmeyen (ücretsiz) çeviri sağlayıcıları.
     /// 1) Google dahili "clients5" uç noktası (anahtarsız, otomatik dil algılama)
     /// 2) MyMemory (anahtarsız, dokümante edilmiş; anonim 5000 karakter/gün, tek istekte 500 byte)
-    /// Yönlendirme mantığı: metin Türkçe ise İngilizceye, aksi halde Türkçeye çevirir.
+    /// Yönlendirme mantığı: metin Türkçe ise hedef yabancı dile (EN veya FR), aksi halde Türkçeye çevirir.
     /// </summary>
     public static class FreeTranslationService
     {
         private static readonly HttpClient HttpClient = new HttpClient();
         private const int MyMemoryMaxChunkBytes = 450; // 500 byte limitine güvenli mesafe
 
-        public static async Task<string> TranslateAsync(string text)
+        public static async Task<string> TranslateAsync(string text, string foreignLang = "en")
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
 
-            string target = DetectTargetLanguage(text);
+            string target = DetectTargetLanguage(text, foreignLang);
 
             GoogleTranslationResult? googleResult = await TryGoogleKeylessAsync(text, target);
 
             // Google kaynağı tespit edip hedef dil yerel tespitle uyuşmuyorsa hedefi düzelt.
             // Bu, "aleviligin gercek kokeni" gibi Türkçe karakter içermeyen Türkçe cümlelerin
-            // Türkçe'ye çevrilmek yerine İngilizce'ye çevrilmesini sağlar.
-            string? preferredTarget = GetPreferredTargetLanguage(target, googleResult);
+            // Türkçe'ye çevrilmek yerine hedef yabancı dile çevrilmesini sağlar.
+            string? preferredTarget = GetPreferredTargetLanguage(target, googleResult, foreignLang);
             if (preferredTarget != null)
             {
                 target = preferredTarget;
@@ -48,12 +48,24 @@ namespace YaziciCS.Services
                    "veya Ayarlar'dan çeviri sağlayıcısını Gemini (API anahtarlı) olarak seçin.";
         }
 
-        /// <summary>
-        /// Metin Türkçe ise hedef İngilizce ("en"), aksi halde hedef Türkçe ("tr").
-        /// </summary>
-        internal static string DetectTargetLanguage(string text)
+        public static Task<string> TranslateFrenchAsync(string text)
         {
-            return LooksTurkish(text) ? "en" : "tr";
+            return TranslateAsync(text, "fr");
+        }
+
+        /// <summary>
+        /// Metin Türkçe ise hedef yabancı dil ("en" veya "fr"), aksi halde hedef Türkçe ("tr").
+        /// </summary>
+        internal static string DetectTargetLanguage(string text, string foreignLang = "en")
+        {
+            if (foreignLang.Equals("fr", StringComparison.OrdinalIgnoreCase))
+            {
+                if (TurkishDistinctCharsRegex.IsMatch(text)) return "fr";
+                if (FrenchCharsRegex.IsMatch(text) || LooksFrench(text)) return "tr";
+                return LooksTurkish(text) ? "fr" : "tr";
+            }
+
+            return LooksTurkish(text) ? foreignLang : "tr";
         }
 
         /// <summary>
@@ -61,13 +73,26 @@ namespace YaziciCS.Services
         /// </summary>
         internal static string? GetPreferredTargetLanguage(
             string currentTarget,
-            GoogleTranslationResult? googleResult)
+            GoogleTranslationResult? googleResult,
+            string foreignLang = "en")
         {
             string sourceLanguage = (googleResult?.DetectedSourceLanguage ?? "").Trim();
             if (sourceLanguage.Length == 0) return null;
 
-            if (sourceLanguage.Equals("tr", StringComparison.OrdinalIgnoreCase)) return "en";
-            if (currentTarget.Equals("en", StringComparison.OrdinalIgnoreCase)) return "tr";
+            if (sourceLanguage.Equals("tr", StringComparison.OrdinalIgnoreCase))
+            {
+                return currentTarget.Equals(foreignLang, StringComparison.OrdinalIgnoreCase) ? null : foreignLang;
+            }
+
+            if (sourceLanguage.Equals(foreignLang, StringComparison.OrdinalIgnoreCase))
+            {
+                return currentTarget.Equals("tr", StringComparison.OrdinalIgnoreCase) ? null : "tr";
+            }
+
+            if (!currentTarget.Equals("tr", StringComparison.OrdinalIgnoreCase))
+            {
+                return "tr";
+            }
 
             return null;
         }
@@ -77,6 +102,33 @@ namespace YaziciCS.Services
         /// </summary>
         private static readonly Regex TurkishCharsRegex =
             new Regex("[çğıöşüÇĞİÖŞÜ]", RegexOptions.Compiled);
+
+        private static readonly Regex TurkishDistinctCharsRegex =
+            new Regex("[ğĞıİşŞ]", RegexOptions.Compiled);
+
+        private static readonly Regex FrenchCharsRegex =
+            new Regex("[éèêëàâîïôùûÉÈÊËÀÂÎÏÔÙÛœæŒÆ]", RegexOptions.Compiled);
+
+        private static readonly HashSet<string> FrenchStopWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "le", "la", "les", "de", "des", "du", "un", "une", "et", "est", "en", "que", "qui",
+            "dans", "pour", "pas", "sur", "ce", "cette", "ces", "avec", "vous", "nous", "ils", "elle", "il", "je", "tu"
+        };
+
+        internal static bool LooksFrench(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            if (FrenchCharsRegex.IsMatch(text)) return true;
+
+            string[] words = Regex.Split(text.ToLowerInvariant(), "[^a-zçéèêëàâîïôùûœæ]+")
+                                  .Where(w => w.Length > 0)
+                                  .ToArray();
+            if (words.Length == 0) return false;
+
+            int hits = words.Count(w => FrenchStopWords.Contains(w));
+            return hits >= 2 || (words.Length <= 3 && hits >= 1);
+        }
 
         private static readonly HashSet<string> TurkishStopWords = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -235,7 +287,8 @@ namespace YaziciCS.Services
 
                 string value = element.GetString() ?? "";
                 if (value.Equals("tr", StringComparison.OrdinalIgnoreCase) ||
-                    value.Equals("en", StringComparison.OrdinalIgnoreCase))
+                    value.Equals("en", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("fr", StringComparison.OrdinalIgnoreCase))
                 {
                     return value.ToLowerInvariant();
                 }
