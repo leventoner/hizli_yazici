@@ -27,10 +27,21 @@ namespace YaziciCS.Services
 
             string target = DetectTargetLanguage(text);
 
-            string? result = await TryGoogleKeylessAsync(text, target);
-            if (!string.IsNullOrEmpty(result)) return result!;
+            GoogleTranslationResult? googleResult = await TryGoogleKeylessAsync(text, target);
 
-            result = await TryMyMemoryAsync(text, target);
+            // Google kaynağı tespit edip hedef dil yerel tespitle uyuşmuyorsa hedefi düzelt.
+            // Bu, "aleviligin gercek kokeni" gibi Türkçe karakter içermeyen Türkçe cümlelerin
+            // Türkçe'ye çevrilmek yerine İngilizce'ye çevrilmesini sağlar.
+            string? preferredTarget = GetPreferredTargetLanguage(target, googleResult);
+            if (preferredTarget != null)
+            {
+                target = preferredTarget;
+                googleResult = await TryGoogleKeylessAsync(text, target);
+            }
+
+            if (!string.IsNullOrEmpty(googleResult?.TranslatedText)) return googleResult.TranslatedText;
+
+            string? result = await TryMyMemoryAsync(text, target);
             if (!string.IsNullOrEmpty(result)) return result!;
 
             return "Hata: Ücretsiz çeviri servislerine ulaşılamadı. İnternet bağlantınızı kontrol edin " +
@@ -43,6 +54,22 @@ namespace YaziciCS.Services
         internal static string DetectTargetLanguage(string text)
         {
             return LooksTurkish(text) ? "en" : "tr";
+        }
+
+        /// <summary>
+        /// Google'ın döndüğü algılanan kaynak dile göre hedefi düzeltir.
+        /// </summary>
+        internal static string? GetPreferredTargetLanguage(
+            string currentTarget,
+            GoogleTranslationResult? googleResult)
+        {
+            string sourceLanguage = (googleResult?.DetectedSourceLanguage ?? "").Trim();
+            if (sourceLanguage.Length == 0) return null;
+
+            if (sourceLanguage.Equals("tr", StringComparison.OrdinalIgnoreCase)) return "en";
+            if (currentTarget.Equals("en", StringComparison.OrdinalIgnoreCase)) return "tr";
+
+            return null;
         }
 
         /// <summary>
@@ -73,11 +100,17 @@ namespace YaziciCS.Services
             return hits >= 2 || (words.Length <= 3 && hits >= 1);
         }
 
+        internal sealed class GoogleTranslationResult
+        {
+            public string? TranslatedText { get; init; }
+            public string? DetectedSourceLanguage { get; init; }
+        }
+
         /// <summary>
         /// Google'ın Chrome sözlük eklentisinin kullandığı, API anahtarı gerektirmeyen
         /// dahili uç noktası. sl=auto ile kaynak dili otomatik algılar.
         /// </summary>
-        private static async Task<string?> TryGoogleKeylessAsync(string text, string target)
+        private static async Task<GoogleTranslationResult?> TryGoogleKeylessAsync(string text, string target)
         {
             try
             {
@@ -96,8 +129,7 @@ namespace YaziciCS.Services
                 if (!response.IsSuccessStatusCode) return null;
 
                 string json = await response.Content.ReadAsStringAsync();
-                string? translated = ParseGoogleKeylessResponse(json);
-                return string.IsNullOrWhiteSpace(translated) ? null : translated!.Trim();
+                return ParseGoogleKeylessResult(json);
             }
             catch
             {
@@ -109,7 +141,7 @@ namespace YaziciCS.Services
         /// clients5 yanıtı ya {"sentences":[{"trans":...}]} ya da uzun metinde
         /// [["çeviri1","src"],["çeviri2","src"]] biçiminde bir dizi olabilir.
         /// </summary>
-        internal static string? ParseGoogleKeylessResponse(string json)
+        internal static GoogleTranslationResult? ParseGoogleKeylessResult(string json)
         {
             if (string.IsNullOrWhiteSpace(json)) return null;
 
@@ -131,31 +163,82 @@ namespace YaziciCS.Services
                             sb.Append(trans.GetString());
                         }
                     }
-                    return sb.ToString();
+
+                    return new GoogleTranslationResult
+                    {
+                        TranslatedText = sb.ToString().Trim(),
+                        DetectedSourceLanguage = ReadDetectedSourceLanguage(root)
+                    };
                 }
 
                 if (root.ValueKind == JsonValueKind.Array)
                 {
                     var sb = new StringBuilder();
+                    string? detectedSourceLanguage = null;
+
                     foreach (var element in root.EnumerateArray())
                     {
                         if (element.ValueKind == JsonValueKind.Array &&
-                            element.GetArrayLength() > 0 &&
-                            element[0].ValueKind == JsonValueKind.String)
+                            element.GetArrayLength() > 0)
                         {
-                            sb.Append(element[0].GetString());
+                            if (element[0].ValueKind == JsonValueKind.String)
+                            {
+                                sb.Append(element[0].GetString());
+                            }
+
+                            if (element.GetArrayLength() > 1 &&
+                                element[1].ValueKind == JsonValueKind.String &&
+                                string.IsNullOrWhiteSpace(detectedSourceLanguage))
+                            {
+                                detectedSourceLanguage = element[1].GetString();
+                            }
                         }
                         else if (element.ValueKind == JsonValueKind.String)
                         {
                             sb.Append(element.GetString());
                         }
                     }
-                    return sb.ToString();
+
+                    detectedSourceLanguage ??= ReadDetectedSourceLanguage(root);
+
+                    return new GoogleTranslationResult
+                    {
+                        TranslatedText = sb.ToString().Trim(),
+                        DetectedSourceLanguage = detectedSourceLanguage
+                    };
                 }
             }
             catch (JsonException)
             {
                 return null;
+            }
+
+            return null;
+        }
+
+        private static string? ReadDetectedSourceLanguage(JsonElement root)
+        {
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("src", out var source) &&
+                source.ValueKind == JsonValueKind.String)
+            {
+                return source.GetString();
+            }
+
+            if (root.ValueKind != JsonValueKind.Array) return null;
+
+            // Uzun metin biçiminde kaynak dil kök dizinin bir elemanı olarak döndürülebilir:
+            // [["çeviri","src"],null,"tr",...]
+            foreach (var element in root.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.String) continue;
+
+                string value = element.GetString() ?? "";
+                if (value.Equals("tr", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("en", StringComparison.OrdinalIgnoreCase))
+                {
+                    return value.ToLowerInvariant();
+                }
             }
 
             return null;
