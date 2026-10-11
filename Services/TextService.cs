@@ -119,9 +119,7 @@ namespace YaziciCS.Services
             return new System.Collections.Generic.List<string>
             {
                 "models/gemini-3.6-flash",
-                "models/gemini-3.5-flash",
                 "models/gemini-3.8-flash",
-                "models/gemini-3.7-flash"
             };
         }
 
