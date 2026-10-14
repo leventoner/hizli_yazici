@@ -21,7 +21,7 @@
             </Border>
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock x:Name="TxtTitle" Text="Başlık" FontWeight="Bold" FontSize="13" Foreground="White"/>
-                <TextBlock x:Name="TxtMessage" Text="Mesaj içeriği..." FontSize="11" Foreground="#c8d6e5" TextTrimming="CharacterEllipsis" MaxLines="2" Margin="0,2,0,0"/>
+                <TextBlock x:Name="TxtMessage" Text="Mesaj içeriği..." FontSize="11" Foreground="#c8d6e5" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxHeight="36" Margin="0,2,0,0"/>
             </StackPanel>
         </Grid>
     </Border>
