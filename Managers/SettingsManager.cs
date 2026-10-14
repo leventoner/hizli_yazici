@@ -124,6 +124,10 @@ namespace YaziciCS.Managers
                         }
                     }
                 }
+                if (string.IsNullOrEmpty(Current.GeminiApiKey))
+                {
+                    Current.GeminiApiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? "";
+                }
             }
             catch { }
         }

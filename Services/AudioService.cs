@@ -17,6 +17,9 @@ namespace YaziciCS.Services
         {
             try 
             {
+                // Ensure any previous session is safely closed
+                mciSendString("close recsound", null, 0, IntPtr.Zero);
+
                 mciSendString("open new Type waveaudio Alias recsound", null, 0, IntPtr.Zero);
                 mciSendString("set recsound bitspersample 16 samplespersec 16000 channels 1 alignment 2", null, 0, IntPtr.Zero);
                 mciSendString("record recsound", null, 0, IntPtr.Zero);
@@ -39,8 +42,14 @@ namespace YaziciCS.Services
 
             if (!File.Exists(filePath)) return "Hata: Kayıt dosyası bulunamadı.";
 
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length < 500)
+            {
+                return "Ses algılanamadı (Kayıt çok kısa veya mikrofon sessiz).";
+            }
+
             string apiKey = Managers.SettingsManager.Current.GeminiApiKey;
-            if (string.IsNullOrEmpty(apiKey)) return "Hata: Gemini API anahtarı bulunamadı (.env dosyasını kontrol edin).";
+            if (string.IsNullOrEmpty(apiKey)) return "Hata: Gemini API anahtarı bulunamadı (.env veya Ayarlar kontrol edin).";
 
             var prioritized = TextService.GetPrioritizedModels();
 
@@ -64,7 +73,7 @@ namespace YaziciCS.Services
                                 parts = new object[]
                                 {
                                     new { inlineData = new { mimeType = "audio/wav", data = base64Audio } },
-                                    new { text = "Bu sesi metne çevir. Sadece metni döndür, ekleme yapma. Dil muhtemelen Türkçedir." }
+                                    new { text = "Bu ses kaydını dinle ve konuşmayı eksiksiz olarak metne çevir. Sadece konuşulan Türkçe metni döndür, ekleme veya açıklama yapma." }
                                 }
                             }
                         }
@@ -90,16 +99,16 @@ namespace YaziciCS.Services
                         }
                         else
                         {
-                            lastError = $"{modelResourceName}: {response.StatusCode} - {respText}";
+                            lastError = $"{modelResourceName}: {(int)response.StatusCode}";
                         }
                     }
                     catch (Exception ex)
                     {
-                        lastError = $"{modelResourceName} İstisna: {ex.Message}";
+                        lastError = $"{modelResourceName}: {ex.Message}";
                     }
                 }
 
-                return $"Ses anlaşılamadı.\n\nSon Hata: {lastError}";
+                return $"Ses anlaşılamadı (Modeller yoğun: {lastError}). Lütfen tekrar deneyin.";
             }
             catch (Exception ex)
             {

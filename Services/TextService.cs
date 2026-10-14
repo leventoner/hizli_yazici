@@ -171,6 +171,17 @@ namespace YaziciCS.Services
                 }
             }
 
+            // Otomatik Yedek: Tüm modeller hata verirse veya 503 olursa ücretsiz kural motoru devreye girsin
+            try
+            {
+                string freeFallback = FreeTextImprover.Improve(originalText);
+                if (originalText.Trim() != freeFallback.Trim())
+                {
+                    return freeFallback;
+                }
+            }
+            catch { }
+
             return $"Hiçbir model yanıt vermedi.\n\nSon Hata:\n{lastError}";
         }
 
