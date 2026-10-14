@@ -1,0 +1,8 @@
+{
+  "name": "Hızlı Yazıcı",
+  "description": "Akıllı Türkçe metin düzeltme, yapay zeka ile iyileştirme, sesle yazma ve iki yönlü çeviri asistanı.",
+  "requestFrame": false,
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
