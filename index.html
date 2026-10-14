@@ -2,6 +2,55 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Prevent browser extensions (e.g. request interceptors, proxy tools) from throwing
+      // "TypeError: Cannot set property fetch of #<Window> which has only a getter"
+      (function() {
+        try {
+          var _origFetch = window.fetch ? window.fetch.bind(window) : null;
+          if (_origFetch) {
+            Object.defineProperty(window, 'fetch', {
+              get: function() {
+                return _origFetch;
+              },
+              set: function(fn) {
+                _origFetch = fn;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          try {
+            var _protoFetch = Window.prototype.fetch;
+            Object.defineProperty(Window.prototype, 'fetch', {
+              get: function() {
+                return _protoFetch;
+              },
+              set: function(fn) {
+                _protoFetch = fn;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (err) {}
+        }
+
+        // Suppress unhandled errors injected by third-party browser extensions
+        window.addEventListener('error', function(event) {
+          if (
+            event &&
+            event.filename &&
+            (event.filename.indexOf('chrome-extension://') !== -1 ||
+             event.filename.indexOf('moz-extension://') !== -1)
+          ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <link rel="icon" type="image/x-icon" href="/icon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hızlı Yazıcı</title>

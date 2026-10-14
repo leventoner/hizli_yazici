@@ -1,0 +1,28 @@
+<Window x:Class="YaziciCS.UI.NotificationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Notification" Height="85" Width="320"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        Loaded="Window_Loaded">
+    
+    <Border x:Name="MainBorder" CornerRadius="12" BorderThickness="2" Margin="5" Padding="12,10"
+            Background="#1e1e24">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="12" ShadowDepth="0" Opacity="0.6"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border x:Name="IconBadge" Width="36" Height="36" CornerRadius="8" Margin="0,0,10,0" VerticalAlignment="Center">
+                <TextBlock x:Name="IconText" Text="✨" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtTitle" Text="Başlık" FontWeight="Bold" FontSize="13" Foreground="White"/>
+                <TextBlock x:Name="TxtMessage" Text="Mesaj içeriği..." FontSize="11" Foreground="#c8d6e5" TextTrimming="CharacterEllipsis" MaxLines="2" Margin="0,2,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
