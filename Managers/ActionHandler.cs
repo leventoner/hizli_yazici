@@ -11,7 +11,7 @@ namespace YaziciCS.Managers
         public static Action<string, string, string>? ShowNotification { get; set; }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
         private const byte VK_CONTROL = 0x11;
         private const byte VK_C = 0x43;
@@ -19,15 +19,17 @@ namespace YaziciCS.Managers
 
         private static async Task SimulateCtrlC()
         {
-            keybd_event(VK_CONTROL, 0, 0, 0);
-            keybd_event(VK_C, 0, 0, 0);
-            keybd_event(VK_C, 0, KEYEVENTF_KEYUP, 0);
-            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+            keybd_event(VK_CONTROL, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
+            keybd_event(VK_C, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
+            keybd_event(VK_C, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
+            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             await Task.Delay(400);
         }
 
         public static async Task HandleFixClipboardAsync(bool triggerCopy = false)
         {
+            if (!SettingsManager.Current.EnableCharacterFix) return;
+
             if (triggerCopy) await SimulateCtrlC();
 
             string text = await TextService.GetClipboardTextAsync();
@@ -138,17 +140,39 @@ namespace YaziciCS.Managers
                     return;
                 }
 
+                // Halihazırda kayıt yapılıyorsa tekrar tetiklendiğinde hemen durdur ve çevir
+                if (AudioService.IsRecording)
+                {
+                    ShowNotification?.Invoke("Kayıt Tamamlandı", "Ses işleniyor...", "#3498db");
+                    AudioService.StopRecording();
+                    return;
+                }
+
                 int duration = SettingsManager.Current.SttDuration;
-                ShowNotification?.Invoke("Dinleniyor...", $"Lütfen konuşun ({duration} saniye).", "#9b59b6");
+                if (duration <= 0) duration = 10;
+                string hotkey = SettingsManager.Current.SttHotkey.ToUpper();
+                ShowNotification?.Invoke("Dinleniyor...", $"Konuşun... (Bitirmek için {hotkey}'e tekrar basın veya bekleyin)", "#9b59b6");
 
                 string tempFile = Path.Combine(Path.GetTempPath(), "yazici_rec.wav");
-                await AudioService.RecordAudioAsync(tempFile, duration);
+                bool recordSuccess = await AudioService.RecordAudioAsync(tempFile, duration);
 
-                ShowNotification?.Invoke("İşleniyor...", "Sesiniz metne çevriliyor...", "#e67e22");
+                if (!recordSuccess)
+                {
+                    ShowNotification?.Invoke("Uyarı", "Kayıt dosyası oluşturulamadı veya mikrofon sesi alınamadı.", "#f1c40f");
+                    return;
+                }
+
+                ShowNotification?.Invoke("İşleniyor...", "Ses metne çevriliyor (Lokal Whisper)...", "#e67e22");
 
                 string transcribed = await AudioService.TranscribeAudioAsync(tempFile);
 
-                if (!string.IsNullOrEmpty(transcribed) && !transcribed.StartsWith("Hata") && !transcribed.StartsWith("API Hatası") && !transcribed.StartsWith("Bağlantı") && !transcribed.StartsWith("Ses anlaşılamadı"))
+                if (!string.IsNullOrEmpty(transcribed) && 
+                    !transcribed.StartsWith("Hata") && 
+                    !transcribed.StartsWith("API Hatası") && 
+                    !transcribed.StartsWith("Bağlantı") && 
+                    !transcribed.StartsWith("Ses algılanamadı") &&
+                    !transcribed.StartsWith("Ses anlaşılamadı") &&
+                    !transcribed.StartsWith("Lokal Ses Tanıma Hatası"))
                 {
                     await TextService.SetClipboardTextAsync(transcribed);
                     ShowNotification?.Invoke("Panoya Kopyalandı!", transcribed, "#2ecc71");

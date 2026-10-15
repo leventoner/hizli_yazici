@@ -7,12 +7,14 @@ namespace YaziciCS.Managers
     public class GlobalMouseHook : IDisposable
     {
         private const int WH_MOUSE_LL = 14;
+        private const int WM_LBUTTONDOWN = 0x0201;
         private const int WM_LBUTTONUP = 0x0202;
         private const int WM_RBUTTONUP = 0x0205;
 
         private LowLevelMouseProc proc;
         private IntPtr hookId = IntPtr.Zero;
 
+        public event Action<int, int>? LeftButtonDown;
         public event Action<int, int>? LeftButtonUp;
 
         public GlobalMouseHook()
@@ -49,10 +51,18 @@ namespace YaziciCS.Managers
 
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (nCode >= 0 && wParam == (IntPtr)WM_LBUTTONUP)
+            if (nCode >= 0)
             {
-                var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                LeftButtonUp?.Invoke(hookStruct.pt.x, hookStruct.pt.y);
+                if (wParam == (IntPtr)WM_LBUTTONDOWN)
+                {
+                    var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                    LeftButtonDown?.Invoke(hookStruct.pt.x, hookStruct.pt.y);
+                }
+                else if (wParam == (IntPtr)WM_LBUTTONUP)
+                {
+                    var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                    LeftButtonUp?.Invoke(hookStruct.pt.x, hookStruct.pt.y);
+                }
             }
             return CallNextHookEx(hookId, nCode, wParam, lParam);
         }

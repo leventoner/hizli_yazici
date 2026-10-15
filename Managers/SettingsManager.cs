@@ -46,6 +46,9 @@ namespace YaziciCS.Managers
         [JsonPropertyName("translation_email")]
         public string TranslationEmail { get; set; } = "";
 
+        [JsonPropertyName("stt_provider")]
+        public string SttProvider { get; set; } = "local";
+
         [JsonIgnore]
         public string GeminiApiKey { get; set; } = "";
     }

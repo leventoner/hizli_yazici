@@ -53,6 +53,8 @@ namespace YaziciCS
             notifyIcon.Visible = true;
 
             var contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add("🎙️ Sesle Yaz (Ctrl+Shift+Y)", null, (s, e) => _ = ActionHandler.HandleSpeechToTextAsync());
+            contextMenu.Items.Add(new ToolStripSeparator());
             contextMenu.Items.Add("⚙️ Ayarlar", null, (s, e) => OpenSettings());
             contextMenu.Items.Add(new ToolStripSeparator());
             contextMenu.Items.Add("❌ Çıkış", null, (s, e) => ExitApplication());

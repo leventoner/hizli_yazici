@@ -12,6 +12,19 @@ namespace YaziciCS.Managers
         private const int WM_SYSKEYDOWN = 0x0104;
         private const int WM_SYSKEYUP = 0x0105;
 
+        private const uint LLKHF_LOWER_IL_INJECTED = 0x00000002;
+        private const uint LLKHF_INJECTED = 0x00000010;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KBDLLHOOKSTRUCT
+        {
+            public uint vkCode;
+            public uint scanCode;
+            public uint flags;
+            public uint time;
+            public UIntPtr dwExtraInfo;
+        }
+
         private LowLevelKeyboardProc proc;
         private IntPtr hookId = IntPtr.Zero;
 
@@ -36,9 +49,18 @@ namespace YaziciCS.Managers
         {
             if (nCode >= 0)
             {
-                int vkCode = Marshal.ReadInt32(lParam);
-                bool isDown = wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN;
-                KeyAction?.Invoke(vkCode, isDown);
+                var hookStruct = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+
+                bool isInjected = (hookStruct.flags & LLKHF_INJECTED) != 0 ||
+                                  (hookStruct.flags & LLKHF_LOWER_IL_INJECTED) != 0 ||
+                                  hookStruct.dwExtraInfo == (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE;
+
+                if (!isInjected)
+                {
+                    int vkCode = (int)hookStruct.vkCode;
+                    bool isDown = wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN;
+                    KeyAction?.Invoke(vkCode, isDown);
+                }
             }
             return CallNextHookEx(hookId, nCode, wParam, lParam);
         }

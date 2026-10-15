@@ -62,6 +62,21 @@
                 <TextBox Text="{Binding Current.TranslationEmail, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,5" Background="#1e1e1e" Foreground="White" Padding="5"/>
                 <TextBlock Text="E-posta girilirse MyMemory ücretsiz günlük limiti 5.000'den 50.000 karaktere çıkar."
                            FontSize="11" Foreground="#9e9e9e" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                <TextBlock Text="🎙️ Sesle Yazma (Speech-to-Text)" FontSize="16" FontWeight="Bold" Foreground="{Binding Current.ColorTheme}" Margin="0,10,0,5"/>
+                <Rectangle Height="1" Fill="#333" Margin="0,0,0,10"/>
+
+                <TextBlock Text="Maksimum Kayıt Süresi (Saniye)"/>
+                <TextBox Text="{Binding Current.SttDuration, UpdateSourceTrigger=PropertyChanged}" Margin="0,5,0,10" Background="#1e1e1e" Foreground="White" Padding="5"/>
+
+                <TextBlock Text="Ses Tanıma Motoru"/>
+                <ComboBox SelectedValue="{Binding Current.SttProvider, UpdateSourceTrigger=PropertyChanged}"
+                          SelectedValuePath="Tag" Margin="0,5,0,5" Background="#1e1e1e" Foreground="White">
+                    <ComboBoxItem Content="Lokal AI - Whisper (Tamamen Çevrimdışı, Kota Yok)" Tag="local"/>
+                    <ComboBoxItem Content="Gemini AI (Bulut, API Anahtarı Gerekir)" Tag="gemini"/>
+                </ComboBox>
+                <TextBlock Text="Öneri: 'Lokal AI - Whisper' bilgisayarınızda tamamen yerel çalışır, internet ve API kotası gerektirmez."
+                           FontSize="11" Foreground="#9e9e9e" TextWrapping="Wrap" Margin="0,0,0,10"/>
             </StackPanel>
         </ScrollViewer>
         

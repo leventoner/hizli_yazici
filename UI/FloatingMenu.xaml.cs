@@ -85,5 +85,11 @@ namespace YaziciCS.UI
             HideMenu();
             await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: false);
         }
+
+        private async void BtnVoice_Click(object sender, RoutedEventArgs e)
+        {
+            HideMenu();
+            await ActionHandler.HandleSpeechToTextAsync();
+        }
     }
 }

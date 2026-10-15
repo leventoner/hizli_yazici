@@ -24,6 +24,7 @@ namespace YaziciCS.UI
                 FloatingMenuDuration = SettingsManager.Current.FloatingMenuDuration,
                 TranslationProvider = SettingsManager.Current.TranslationProvider,
                 TranslationEmail = SettingsManager.Current.TranslationEmail,
+                SttProvider = SettingsManager.Current.SttProvider,
                 GeminiApiKey = SettingsManager.Current.GeminiApiKey
             };
 

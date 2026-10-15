@@ -1,7 +1,7 @@
 <Window x:Class="YaziciCS.UI.FloatingMenu"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FloatingMenu" Height="48" Width="184"
+        Title="FloatingMenu" Height="48" Width="228"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="True"
         Opacity="0" Loaded="Window_Loaded">
@@ -119,6 +119,18 @@
                                    FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display"/>
                     </Border>
                 </Grid>
+            </Button>
+
+            <!-- Sesle Yaz (Mikrofon) -->
+            <Button x:Name="BtnVoice" Style="{StaticResource MenuButtonStyle}" ToolTip="Sesle Yaz (Ctrl+Shift+Y)" Click="BtnVoice_Click">
+                <Viewbox Width="17" Height="17">
+                    <Canvas Width="24" Height="24">
+                        <Path Data="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" 
+                              Stroke="White" StrokeThickness="1.8" Fill="#e74c3c"/>
+                        <Path Data="M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3 M8 22h8" 
+                              Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </Canvas>
+                </Viewbox>
             </Button>
         </StackPanel>
     </Border>
