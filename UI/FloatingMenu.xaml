@@ -71,12 +71,14 @@
                 </Viewbox>
             </Button>
 
-            <!-- Metni İyileştir (Yapay Zeka Sparkles - Kendi Dilinde) -->
-            <Button x:Name="BtnImprove" Style="{StaticResource MenuButtonStyle}" ToolTip="Metni İyileştir (Kendi Dilinde)" Click="BtnImprove_Click">
+            <!-- Metni İyileştir (Metin Sihirbazı) -->
+            <Button x:Name="BtnImprove" Style="{StaticResource MenuButtonStyle}" ToolTip="Metin Sihirbazı (Düzelt ve İyileştir)" Click="BtnImprove_Click">
                 <Viewbox Width="18" Height="18">
                     <Canvas Width="24" Height="24">
-                        <Path Data="M10 2 Q10 9 3 10 Q10 11 10 18 Q10 11 17 10 Q10 9 10 2 Z" Fill="#FBBF24"/>
-                        <Path Data="M18 13 Q18 16.5 14.5 17 Q18 17.5 18 21 Q18 17.5 21.5 17 Q18 16.5 18 13 Z" Fill="#FDE68A"/>
+                        <Path Data="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z M14 7l3 3"
+                              Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                        <Path Data="M5 6v4 M7 8H3 M19 14v4 M21 16h-4 M10 2v2 M11 3H9"
+                              Stroke="#FBBF24" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     </Canvas>
                 </Viewbox>
             </Button>

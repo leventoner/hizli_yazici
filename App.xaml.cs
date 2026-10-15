@@ -48,24 +48,7 @@ namespace YaziciCS
         private void SetupSystemTray()
         {
             notifyIcon = new NotifyIcon();
-            
-            try
-            {
-                string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
-                if (File.Exists(iconPath))
-                {
-                    notifyIcon.Icon = new Icon(iconPath);
-                }
-                else
-                {
-                    notifyIcon.Icon = SystemIcons.Application;
-                }
-            }
-            catch
-            {
-                notifyIcon.Icon = SystemIcons.Application;
-            }
-
+            notifyIcon.Icon = GetAppIcon();
             notifyIcon.Text = SettingsManager.Current.ProgramName;
             notifyIcon.Visible = true;
 
@@ -76,6 +59,49 @@ namespace YaziciCS
 
             notifyIcon.ContextMenuStrip = contextMenu;
             notifyIcon.DoubleClick += (s, e) => OpenSettings();
+        }
+
+        private Icon GetAppIcon()
+        {
+            try
+            {
+                // 1. Output directory (BaseDirectory)
+                string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+                if (File.Exists(iconPath))
+                {
+                    return new Icon(iconPath);
+                }
+
+                // 2. Current working directory
+                string cwdPath = Path.Combine(Directory.GetCurrentDirectory(), "icon.ico");
+                if (File.Exists(cwdPath))
+                {
+                    return new Icon(cwdPath);
+                }
+
+                // 3. Project root during development (relative to bin/Debug/...)
+                string devPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "icon.ico"));
+                if (File.Exists(devPath))
+                {
+                    return new Icon(devPath);
+                }
+
+                // 4. Extract embedded application icon from the running process
+                if (!string.IsNullOrEmpty(Environment.ProcessPath) && File.Exists(Environment.ProcessPath))
+                {
+                    var extracted = Icon.ExtractAssociatedIcon(Environment.ProcessPath);
+                    if (extracted != null)
+                    {
+                        return extracted;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                CrashLogger.Log(ex, "Tray icon loading exception");
+            }
+
+            return SystemIcons.Application;
         }
 
         private void OpenSettings()

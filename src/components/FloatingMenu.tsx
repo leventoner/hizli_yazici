@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Globe, Mic, Copy, Check, Pencil } from 'lucide-react';
+import { Wand2, Globe, Mic, Copy, Check, Pencil } from 'lucide-react';
 
 interface FloatingMenuProps {
   themeColor: string;
@@ -70,15 +70,15 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
           <span className="sr-only">Karakter Düzelt</span>
         </button>
 
-        {/* Metni İyileştir (Yapay Zeka Sparkles - Kendi Dilinde) */}
+        {/* Metni İyileştir (Metin Sihirbazı - Kendi Dilinde) */}
         <button
           type="button"
           onClick={onImprove}
           disabled={isLoading}
-          title="Metni İyileştir (Kendi Dilinde)"
+          title="Metin Sihirbazı (Düzelt ve İyileştir)"
           className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40"
         >
-          <Sparkles className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+          <Wand2 className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
           <span className="sr-only">Metni İyileştir</span>
         </button>
 

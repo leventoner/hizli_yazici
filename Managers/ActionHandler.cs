@@ -61,7 +61,7 @@ namespace YaziciCS.Managers
                 return;
             }
 
-            ShowNotification?.Invoke("İşleniyor...", "Metin yapay zeka ile iyileştiriliyor...", "#9b59b6");
+            ShowNotification?.Invoke("İşleniyor...", "Metin sihirbaz ile iyileştiriliyor...", "#9b59b6");
 
             string improved = await TextService.ImproveTextAsync(text);
 
