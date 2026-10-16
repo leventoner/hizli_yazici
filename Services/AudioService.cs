@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -80,7 +81,9 @@ namespace YaziciCS.Services
             {
                 waveIn = new WaveInEvent
                 {
-                    WaveFormat = new WaveFormat(16000, 16, 1) // 16kHz, 16-bit Mono (Whisper compatible)
+                    WaveFormat = new WaveFormat(16000, 16, 1), // 16kHz, 16-bit Mono (Whisper uyumlu)
+                    BufferMilliseconds = 50,  // Daha kısa buffer → daha sık veri toplama → daha pürüzsüz kayıt
+                    DeviceNumber = 0          // Varsayılan mikrofon
                 };
 
                 writer = new WaveFileWriter(tempFilePath, waveIn.WaveFormat);
@@ -169,6 +172,13 @@ namespace YaziciCS.Services
                 return "Ses algılanamadı (Kayıt çok kısa veya mikrofon sessiz).";
             }
 
+            // Ses seviyesi ön kontrolü — sessiz kayıtları erken tespit et
+            float avgLevel = AnalyzeAudioLevel(filePath);
+            if (avgLevel < 50) // Neredeyse tamamen sessiz (16-bit max = 32768)
+            {
+                return "Ses algılanamadı (Mikrofon çok sessiz veya kapalı — mikrofon ayarlarını kontrol edin).";
+            }
+
             string provider = SettingsManager.Current.SttProvider ?? "local";
 
             if (provider.Equals("gemini", StringComparison.OrdinalIgnoreCase))
@@ -187,6 +197,52 @@ namespace YaziciCS.Services
 
             return await TranscribeWithWhisperAsync(filePath);
         }
+
+        /// <summary>
+        /// WAV dosyasının ortalama ses seviyesini (RMS) analiz eder.
+        /// Sessiz kayıtları erken tespit etmek için kullanılır.
+        /// </summary>
+        private static float AnalyzeAudioLevel(string filePath)
+        {
+            try
+            {
+                using var reader = new WaveFileReader(filePath);
+                long totalSamples = 0;
+                double sumSquares = 0;
+
+                // En fazla ilk 5 saniyelik veriyi analiz et (performans için)
+                int bytesPerSample = reader.WaveFormat.BitsPerSample / 8;
+                int maxBytes = reader.WaveFormat.SampleRate * 5 * bytesPerSample * reader.WaveFormat.Channels;
+                byte[] buffer = new byte[4096];
+                int totalBytesRead = 0;
+
+                while (totalBytesRead < maxBytes)
+                {
+                    int bytesRead = reader.Read(buffer, 0, buffer.Length);
+                    if (bytesRead == 0) break;
+                    totalBytesRead += bytesRead;
+
+                    for (int i = 0; i + 1 < bytesRead; i += 2)
+                    {
+                        short sample = (short)(buffer[i] | (buffer[i + 1] << 8));
+                        sumSquares += (double)sample * sample;
+                        totalSamples++;
+                    }
+                }
+
+                if (totalSamples == 0) return 0;
+                return (float)Math.Sqrt(sumSquares / totalSamples);
+            }
+            catch
+            {
+                return float.MaxValue; // Analiz başarısızsa kayda devam et
+            }
+        }
+
+        // Türkçe için Whisper başlangıç prompt'u — model için dil bağlamı sağlar
+        private const string TurkishInitialPrompt =
+            "Bu ses kaydı Türkçe konuşma içermektedir. " +
+            "Türkçe kelimeler: merhaba, evet, hayır, tamam, lütfen, teşekkür ederim.";
 
         public static async Task<string> TranscribeWithWhisperAsync(string filePath)
         {
@@ -211,7 +267,10 @@ namespace YaziciCS.Services
                 }
 
                 using var processor = factory.CreateBuilder()
-                    .WithLanguage("tr")
+                    .WithLanguage("tr")                    // Dili Türkçe'ye kilitle (auto-detect'i devre dışı bırak)
+                    .WithPrompt(TurkishInitialPrompt)      // Türkçe bağlam ipucu ver
+                    .WithNoSpeechThreshold(0.5f)           // Sessizlik segmentlerini filtrele (0-1, düşük = daha agresif filtre)
+                    .WithTemperature(0.0f)                 // Deterministik çıktı için sıcaklığı sıfırla (daha az halüsinasyon)
                     .Build();
 
                 var sb = new StringBuilder();
@@ -219,10 +278,13 @@ namespace YaziciCS.Services
                 {
                     await foreach (var segment in processor.ProcessAsync(fileStream))
                     {
-                        if (!string.IsNullOrWhiteSpace(segment.Text))
-                        {
-                            sb.Append(segment.Text).Append(' ');
-                        }
+                        string segText = segment.Text?.Trim() ?? "";
+
+                        // Whisper'ın sık ürettiği sahte/gürültü segmentlerini filtrele
+                        if (string.IsNullOrWhiteSpace(segText)) continue;
+                        if (IsWhisperHallucination(segText)) continue;
+
+                        sb.Append(segText).Append(' ');
                     }
                 }
 
@@ -240,39 +302,101 @@ namespace YaziciCS.Services
             }
         }
 
-        private static async Task<string> EnsureWhisperModelExistsAsync()
+        /// <summary>
+        /// Whisper'ın sessizlikte veya gürültülü ortamda ürettiği
+        /// yaygın halüsinasyon kalıplarını tespit eder.
+        /// </summary>
+        private static bool IsWhisperHallucination(string text)
         {
-            string[] searchPaths = {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "ggml-tiny.bin"),
-                Path.Combine(Directory.GetCurrentDirectory(), "models", "ggml-tiny.bin"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HizliYazici", "models", "ggml-tiny.bin")
+            // Tamamı noktalama/boşluk mı?
+            if (text.All(c => char.IsPunctuation(c) || char.IsWhiteSpace(c))) return true;
+
+            // Whisper'ın sessizlikte ürettiği bilinen sahte Türkçe/İngilizce ifadeler
+            string[] knownHallucinations =
+            {
+                "teşekkür ederim.", "teşekkürler.", "altyazı:", "altyazılar",
+                "thanks for watching", "thank you for watching", "subtitles by",
+                "www.", ".com", "çeviri:", "[müzik]", "[music]", "(müzik)",
+                "subscribe", "abone ol"
             };
 
-            foreach (var path in searchPaths)
+            string lower = text.ToLowerInvariant().Trim();
+            foreach (var h in knownHallucinations)
             {
-                if (File.Exists(path) && new FileInfo(path).Length > 10_000_000)
+                if (lower == h || lower == h.TrimEnd('.')) return true;
+            }
+
+            return false;
+        }
+
+        private static async Task<string> EnsureWhisperModelExistsAsync()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appDataModels = Path.Combine(appData, "HizliYazici", "models");
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string cwd = Directory.GetCurrentDirectory();
+
+            // Model kalite sırası: small > base > tiny (small = en iyi Türkçe tanıma, ~242MB)
+            var modelPriority = new[]
+            {
+                ("ggml-small.bin", 200_000_000L, GgmlType.Small),
+                ("ggml-base.bin",   70_000_000L, GgmlType.Base),
+                ("ggml-tiny.bin",   10_000_000L, GgmlType.Tiny),
+            };
+
+            // Önce mevcut modelleri ara (kalite sırasına göre)
+            foreach (var (fileName, minSize, _) in modelPriority)
+            {
+                string[] searchPaths =
                 {
-                    return path;
+                    Path.Combine(baseDir, "models", fileName),
+                    Path.Combine(cwd, "models", fileName),
+                    Path.Combine(appDataModels, fileName),
+                };
+                foreach (var path in searchPaths)
+                {
+                    if (File.Exists(path) && new FileInfo(path).Length > minSize)
+                        return path;
                 }
             }
 
-            // Model bulunamadıysa AppData içerisine otomatik indir
-            string targetDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HizliYazici", "models");
-            Directory.CreateDirectory(targetDir);
-            string targetPath = Path.Combine(targetDir, "ggml-tiny.bin");
+            // Hiç model yoksa: small'ı indir (en iyi Türkçe kalitesi)
+            Directory.CreateDirectory(appDataModels);
+            string targetPath = Path.Combine(appDataModels, "ggml-small.bin");
 
             try
             {
-                ActionHandler.ShowNotification?.Invoke("İndiriliyor", "Lokal Whisper ses modeli indiriliyor (~75MB, bir defalık)...", "#9b59b6");
-                using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(GgmlType.Tiny);
+                ActionHandler.ShowNotification?.Invoke(
+                    "İndiriliyor",
+                    "Türkçe için daha iyi Whisper modeli indiriliyor (~242MB, bir defalık)...",
+                    "#9b59b6");
+                using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(GgmlType.Small);
                 using var fileStream = File.OpenWrite(targetPath);
                 await modelStream.CopyToAsync(fileStream);
                 return targetPath;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Model download error: {ex.Message}");
-                return "";
+                Console.WriteLine($"Small model download error: {ex.Message}");
+
+                // Small indirilemezse tiny'i dene (fallback)
+                string tinyPath = Path.Combine(appDataModels, "ggml-tiny.bin");
+                try
+                {
+                    ActionHandler.ShowNotification?.Invoke(
+                        "İndiriliyor",
+                        "Yedek Whisper modeli indiriliyor (~75MB)...",
+                        "#e67e22");
+                    using var tinyStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(GgmlType.Tiny);
+                    using var tinyFile = File.OpenWrite(tinyPath);
+                    await tinyStream.CopyToAsync(tinyFile);
+                    return tinyPath;
+                }
+                catch (Exception ex2)
+                {
+                    Console.WriteLine($"Tiny model download error: {ex2.Message}");
+                    return "";
+                }
             }
         }
 
@@ -303,9 +427,22 @@ namespace YaziciCS.Services
                                 parts = new object[]
                                 {
                                     new { inlineData = new { mimeType = "audio/wav", data = base64Audio } },
-                                    new { text = "Bu ses kaydını dinle ve konuşmayı eksiksiz olarak metne çevir. Sadece konuşulan Türkçe metni döndür, ekleme veya açıklama yapma." }
+                                    new
+                                    {
+                                        text =
+                                            "Bu ses kaydında Türkçe konuşma var. " +
+                                            "Ses kaydındaki Türkçe konuşmayı kelimesi kelimesine ve eksiksiz metne çevir. " +
+                                            "SADECE konuşulan metni yaz — başka hiçbir şey ekleme, açıklama yapma, dil belirtme. " +
+                                            "Eğer ses yoksa veya anlaşılmıyorsa boş string döndür."
+                                    }
                                 }
                             }
+                        },
+                        generationConfig = new
+                        {
+                            temperature = 0,       // Deterministik çıktı
+                            topP = 1,
+                            topK = 1
                         }
                     };
 
