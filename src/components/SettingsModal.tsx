@@ -196,6 +196,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-slate-400">Metin zaten düzgünse &quot;Düzeltme gerekmedi&quot; bildirimi ver</span>
                 </div>
               </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 cursor-pointer hover:bg-slate-800 transition-colors md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.auto_copy_on_action ?? true}
+                  onChange={(e) => setForm({ ...form, auto_copy_on_action: e.target.checked })}
+                  className="mt-0.5 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-slate-900 w-4 h-4"
+                />
+                <div className="text-xs">
+                  <span className="font-semibold text-white block">İşlem Yapılınca Panoya Kopyala</span>
+                  <span className="text-slate-400">
+                    Metin seçildiğinde panonuz kesinlikle değişmez; sadece Düzelt, İyileştir veya Çevir butonlarına tıklandığında sonuç panoya kopyalanır.
+                  </span>
+                </div>
+              </label>
             </div>
           </section>
 

@@ -40,6 +40,7 @@ namespace YaziciCS.Services
         }
 
         public static Task<string> TranslateFrenchAsync(string text) => TranslateAsync(text, "fr");
+        public static Task<string> TranslateDutchAsync(string text) => TranslateAsync(text, "nl");
 
         internal static string DetectTargetLanguage(string text, string foreignLang = "en")
         {
@@ -48,6 +49,13 @@ namespace YaziciCS.Services
                 if (TurkishDistinctCharsRegex.IsMatch(text)) return "fr";
                 if (FrenchCharsRegex.IsMatch(text) || LooksFrench(text)) return "tr";
                 return LooksTurkish(text) ? "fr" : "tr";
+            }
+
+            if (foreignLang.Equals("nl", StringComparison.OrdinalIgnoreCase))
+            {
+                if (TurkishDistinctCharsRegex.IsMatch(text)) return "nl";
+                if (LooksDutch(text)) return "tr";
+                return LooksTurkish(text) ? "nl" : "tr";
             }
 
             return LooksTurkish(text) ? foreignLang : "tr";
@@ -89,6 +97,13 @@ namespace YaziciCS.Services
             "dans", "pour", "pas", "sur", "ce", "cette", "ces", "avec", "vous", "nous", "ils", "elle", "il", "je", "tu"
         };
 
+        private static readonly HashSet<string> DutchStopWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "de", "het", "een", "en", "van", "ik", "te", "dat", "die", "in", "is", "op", "niet", "met",
+            "zijn", "voor", "maar", "om", "ook", "je", "er", "ze", "we", "als", "bij", "wij", "jij",
+            "hebben", "naar", "over", "wat", "mijn", "geen", "dit", "uit", "wel", "hoe", "zo", "door"
+        };
+
         internal static bool LooksFrench(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return false;
@@ -100,6 +115,25 @@ namespace YaziciCS.Services
             if (words.Length == 0) return false;
 
             int hits = words.Count(w => FrenchStopWords.Contains(w));
+            return hits >= 2 || (words.Length <= 3 && hits >= 1);
+        }
+
+        internal static bool LooksDutch(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            string lower = text.ToLowerInvariant();
+            if (lower.Contains("ij") || lower.Contains("oe") || lower.Contains("sch"))
+            {
+                // Common Dutch digraphs
+            }
+
+            string[] words = Regex.Split(lower, "[^a-z]+")
+                                  .Where(w => w.Length > 0)
+                                  .ToArray();
+            if (words.Length == 0) return false;
+
+            int hits = words.Count(w => DutchStopWords.Contains(w));
             return hits >= 2 || (words.Length <= 3 && hits >= 1);
         }
 
@@ -241,7 +275,8 @@ namespace YaziciCS.Services
                 string value = element.GetString() ?? "";
                 if (value.Equals("tr", StringComparison.OrdinalIgnoreCase) ||
                     value.Equals("en", StringComparison.OrdinalIgnoreCase) ||
-                    value.Equals("fr", StringComparison.OrdinalIgnoreCase))
+                    value.Equals("fr", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("nl", StringComparison.OrdinalIgnoreCase))
                 {
                     return value.ToLowerInvariant();
                 }

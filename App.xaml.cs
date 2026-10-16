@@ -32,6 +32,17 @@ namespace YaziciCS
                 });
             };
 
+            // Setup Translation Result Window handler (centered, dynamic sizing, selectable & copyable)
+            ActionHandler.ShowTranslationResult = (originalText, translatedText, langPair) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    var resultWin = new TranslationResultWindow(originalText, translatedText, langPair);
+                    resultWin.Show();
+                    resultWin.Activate();
+                });
+            };
+
             // Floating Menu
             floatingMenu = new FloatingMenu();
 

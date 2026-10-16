@@ -13,6 +13,21 @@ const TurkishStopWords = new Set([
   'ben', 'sen', 'biz', 'siz', 'onlar', 'değil', 'var', 'yok', 'her', 'kadar', 'sonra'
 ]);
 
+const DutchStopWords = new Set([
+  'de', 'het', 'een', 'en', 'van', 'ik', 'te', 'dat', 'die', 'in', 'is', 'op', 'niet', 'met',
+  'zijn', 'voor', 'maar', 'om', 'ook', 'je', 'er', 'ze', 'we', 'als', 'bij', 'wij', 'jij',
+  'hebben', 'naar', 'over', 'wat', 'mijn', 'geen', 'dit', 'uit', 'wel', 'hoe', 'zo', 'door'
+]);
+
+export function looksDutch(text: string): boolean {
+  if (!text || !text.trim()) return false;
+  const words = text.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 0);
+  if (words.length === 0) return false;
+
+  const hits = words.filter(w => DutchStopWords.has(w)).length;
+  return hits >= 2 || (words.length <= 3 && hits >= 1);
+}
+
 export function looksFrench(text: string): boolean {
   if (!text || !text.trim()) return false;
   if (FrenchCharsRegex.test(text)) return true;
@@ -36,10 +51,17 @@ export function looksTurkish(text: string): boolean {
 }
 
 export function detectTargetLanguage(text: string, foreignLang = 'en'): string {
-  if (foreignLang.toLowerCase() === 'fr') {
+  const lang = foreignLang.toLowerCase();
+  if (lang === 'fr') {
     if (TurkishDistinctCharsRegex.test(text)) return 'fr';
     if (FrenchCharsRegex.test(text) || looksFrench(text)) return 'tr';
     return looksTurkish(text) ? 'fr' : 'tr';
+  }
+
+  if (lang === 'nl') {
+    if (TurkishDistinctCharsRegex.test(text)) return 'nl';
+    if (looksDutch(text)) return 'tr';
+    return looksTurkish(text) ? 'nl' : 'tr';
   }
 
   return looksTurkish(text) ? foreignLang : 'tr';
@@ -95,7 +117,7 @@ function parseGoogleKeylessResult(json: any): GoogleResult | null {
             detectedLang = el[1];
           }
         } else if (typeof el === 'string') {
-          if (['tr', 'en', 'fr', 'de', 'es'].includes(el.toLowerCase()) && !detectedLang) {
+          if (['tr', 'en', 'fr', 'nl', 'de', 'es'].includes(el.toLowerCase()) && !detectedLang) {
             detectedLang = el.toLowerCase();
           } else {
             translated += el;

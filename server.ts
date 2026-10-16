@@ -39,6 +39,7 @@ let settings = {
   translation_provider: 'free',
   translation_email: '',
   improve_provider: 'auto', // 'auto' | 'free' | 'gemini'
+  auto_copy_on_action: true,
 };
 
 if (fs.existsSync(SETTINGS_FILE)) {
@@ -243,7 +244,7 @@ app.post('/api/improve', async (req, res) => {
   }
 });
 
-// Translation (İki yönlü Türkçe ↔ EN veya FR)
+// Translation (İki yönlü Türkçe ↔ EN, FR veya NL/Flamanca)
 app.post('/api/translate', async (req, res) => {
   try {
     const { text, targetLanguage = 'en', provider = settings.translation_provider } = req.body;
@@ -251,11 +252,16 @@ app.post('/api/translate', async (req, res) => {
       return res.status(400).json({ error: 'Metin parametresi zorunludur.' });
     }
 
-    const isFrench = targetLanguage.toLowerCase() === 'fr';
+    const lang = targetLanguage.toLowerCase();
+    const targetLangName =
+      lang === 'nl'
+        ? 'Dutch (Flemish / Nederlands)'
+        : lang === 'fr'
+        ? 'French'
+        : 'English';
 
     if (provider === 'gemini') {
       const ai = getGeminiClient();
-      const targetLangName = isFrench ? 'French' : 'English';
       const prompt =
         `You are a translator. Analyze the language of the text between triple quotes below.\n` +
         `- If the text is in Turkish, translate it into natural, fluent ${targetLangName}.\n` +
@@ -272,7 +278,7 @@ app.post('/api/translate', async (req, res) => {
         translated = response.text?.trim() || '';
       } catch (geminiErr) {
         console.warn('Gemini translate failed, falling back to free translation:', geminiErr);
-        translated = await translateFree(text, isFrench ? 'fr' : 'en', settings.translation_email);
+        translated = await translateFree(text, lang, settings.translation_email);
       }
 
       if (translated.startsWith('"""') && translated.endsWith('"""')) {
@@ -284,24 +290,23 @@ app.post('/api/translate', async (req, res) => {
       return res.json({
         original: text,
         translated,
-        targetLanguage: isFrench ? 'fr' : 'en',
+        targetLanguage: lang,
         provider: 'gemini',
       });
     }
 
     // Default to free translation
     try {
-      const translated = await translateFree(text, isFrench ? 'fr' : 'en', settings.translation_email);
+      const translated = await translateFree(text, lang, settings.translation_email);
       res.json({
         original: text,
         translated,
-        targetLanguage: isFrench ? 'fr' : 'en',
+        targetLanguage: lang,
         provider: 'free',
       });
     } catch (freeErr: any) {
       if (process.env.GEMINI_API_KEY) {
         const ai = getGeminiClient();
-        const targetLangName = isFrench ? 'French' : 'English';
         const prompt =
           `You are a translator. Analyze the language of the text between triple quotes below.\n` +
           `- If the text is in Turkish, translate it into natural, fluent ${targetLangName}.\n` +
@@ -317,7 +322,7 @@ app.post('/api/translate', async (req, res) => {
         return res.json({
           original: text,
           translated,
-          targetLanguage: isFrench ? 'fr' : 'en',
+          targetLanguage: lang,
           provider: 'gemini-fallback',
         });
       }

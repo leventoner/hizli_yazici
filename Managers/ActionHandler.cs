@@ -9,6 +9,7 @@ namespace YaziciCS.Managers
     public static class ActionHandler
     {
         public static Action<string, string, string>? ShowNotification { get; set; }
+        public static Action<string, string, string>? ShowTranslationResult { get; set; }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -96,7 +97,14 @@ namespace YaziciCS.Managers
             if (!string.IsNullOrEmpty(translated) && !translated.StartsWith("Hata:") && !translated.StartsWith("Hiçbir model"))
             {
                 await TextService.SetClipboardTextAsync(translated);
-                ShowNotification?.Invoke("Çeviri Tamamlandı! (EN)", translated, "#16a085");
+                if (ShowTranslationResult != null)
+                {
+                    ShowTranslationResult.Invoke(text, translated, "TR ↔ EN");
+                }
+                else
+                {
+                    ShowNotification?.Invoke("Çeviri Tamamlandı! (EN)", translated, "#16a085");
+                }
             }
             else
             {
@@ -122,7 +130,47 @@ namespace YaziciCS.Managers
             if (!string.IsNullOrEmpty(translated) && !translated.StartsWith("Hata:") && !translated.StartsWith("Hiçbir model"))
             {
                 await TextService.SetClipboardTextAsync(translated);
-                ShowNotification?.Invoke("Çeviri Tamamlandı! (FR)", translated, "#16a085");
+                if (ShowTranslationResult != null)
+                {
+                    ShowTranslationResult.Invoke(text, translated, "TR ↔ FR");
+                }
+                else
+                {
+                    ShowNotification?.Invoke("Çeviri Tamamlandı! (FR)", translated, "#16a085");
+                }
+            }
+            else
+            {
+                ShowNotification?.Invoke("İşlem Başarısız", translated, "#e74c3c");
+            }
+        }
+
+        public static async Task HandleTranslateDutchClipboardAsync(bool triggerCopy = false)
+        {
+            if (triggerCopy) await SimulateCtrlC();
+
+            string text = await TextService.GetClipboardTextAsync();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
+                return;
+            }
+
+            ShowNotification?.Invoke("İşleniyor...", "Metin çevriliyor (TR ↔ NL / Flamanca)...", "#ea580c");
+
+            string translated = await TextService.TranslateDutchTextAsync(text);
+
+            if (!string.IsNullOrEmpty(translated) && !translated.StartsWith("Hata:") && !translated.StartsWith("Hiçbir model"))
+            {
+                await TextService.SetClipboardTextAsync(translated);
+                if (ShowTranslationResult != null)
+                {
+                    ShowTranslationResult.Invoke(text, translated, "TR ↔ NL");
+                }
+                else
+                {
+                    ShowNotification?.Invoke("Çeviri Tamamlandı! (NL)", translated, "#ea580c");
+                }
             }
             else
             {

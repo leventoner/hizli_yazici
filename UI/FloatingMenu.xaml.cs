@@ -86,6 +86,12 @@ namespace YaziciCS.UI
             await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: false);
         }
 
+        private async void BtnTranslateNl_Click(object sender, RoutedEventArgs e)
+        {
+            HideMenu();
+            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: false);
+        }
+
         private async void BtnVoice_Click(object sender, RoutedEventArgs e)
         {
             HideMenu();

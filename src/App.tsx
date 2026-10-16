@@ -17,13 +17,14 @@ import {
   ArrowRightLeft,
   Volume2,
 } from 'lucide-react';
-import { AppSettings, ToastMessage, HistoryItem } from './types';
+import { AppSettings, ToastMessage, HistoryItem, TranslationModalState } from './types';
 import { Deasciifier } from './services/deasciifier';
 import { FloatingMenu } from './components/FloatingMenu';
 import { SettingsModal } from './components/SettingsModal';
 import { NotificationToast } from './components/NotificationToast';
 import { AudioRecorderModal } from './components/AudioRecorderModal';
 import { DiffViewer } from './components/DiffViewer';
+import { TranslationResultModal } from './components/TranslationResultModal';
 
 const PRESETS = [
   {
@@ -61,6 +62,13 @@ const PRESETS = [
     color: '#ef4444',
     text: 'İstanbul, Asya ile Avrupa kıtalarını birleştiren büyüleyici tarihi ve eşsiz boğaz manzarasıyla tanınır.',
   },
+  {
+    label: 'Flamanca (NL) ➔ Türkçe',
+    description: 'Hollandaca / Flamanca iki yönlü çeviri',
+    badge: 'TR ↔ NL',
+    color: '#f97316',
+    text: 'Goedemorgen, het weer in Amsterdam is vandaag erg aangenaam en zonnig. We gaan samen een wandeling maken.',
+  },
 ];
 
 export const App: React.FC = () => {
@@ -80,6 +88,7 @@ export const App: React.FC = () => {
     translation_provider: 'free',
     translation_email: '',
     improve_provider: 'auto',
+    auto_copy_on_action: true,
     hasGeminiKey: false,
   });
 
@@ -98,6 +107,15 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [lastDiff, setLastDiff] = useState<{ original: string; modified: string; title: string } | null>(null);
+
+  // Translation result floating window modal
+  const [translationModal, setTranslationModal] = useState<TranslationModalState>({
+    isOpen: false,
+    originalText: '',
+    translatedText: '',
+    targetLang: 'nl',
+    provider: '',
+  });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -218,7 +236,15 @@ export const App: React.FC = () => {
         },
         ...prev.slice(0, 20),
       ]);
-      addToast('Karakterler Düzeltildi!', corrected, '#2ecc71');
+
+      if (settings.auto_copy_on_action) {
+        navigator.clipboard?.writeText(corrected).catch(() => {});
+      }
+      addToast(
+        'Karakterler Düzeltildi!',
+        settings.auto_copy_on_action ? `${corrected} (Panoya Kopyalandı)` : corrected,
+        '#2ecc71'
+      );
     } else if (settings.notify_on_no_change) {
       addToast('Düzeltme Gerekmedi', 'Metin zaten düzgün görünüyor.', '#3498db');
     }
@@ -293,13 +319,21 @@ export const App: React.FC = () => {
         ...prev.slice(0, 20),
       ]);
 
+      if (settings.auto_copy_on_action) {
+        navigator.clipboard?.writeText(improved).catch(() => {});
+      }
+
       const toastTitle = isFallback
         ? 'Metin Düzeltildi (Ücretsiz Motor Devreye Girdi)'
         : isFree
         ? 'Metin Düzeltildi (Ücretsiz Motor)'
         : `Metin İyileştirildi! (${providerLabel})`;
 
-      addToast(toastTitle, improved, isFallback || isFree ? '#10b981' : '#9b59b6');
+      addToast(
+        toastTitle,
+        settings.auto_copy_on_action ? `${improved} (Panoya Kopyalandı)` : improved,
+        isFallback || isFree ? '#10b981' : '#9b59b6'
+      );
     } catch (err: any) {
       addToast('İşlem Başarısız', err.message || 'Hata oluştu.', '#e74c3c');
     } finally {
@@ -319,7 +353,12 @@ export const App: React.FC = () => {
     await handleTranslate('fr');
   };
 
-  const handleTranslate = async (targetLang: 'en' | 'fr') => {
+  // 5. Çeviri (TR ↔ NL / Flamanca - Hollandaca)
+  const handleTranslateNl = async () => {
+    await handleTranslate('nl');
+  };
+
+  const handleTranslate = async (targetLang: 'en' | 'fr' | 'nl') => {
     const targetText = selectedRange
       ? text.substring(selectedRange.start, selectedRange.end)
       : text;
@@ -329,10 +368,15 @@ export const App: React.FC = () => {
       return;
     }
 
-    const langName = targetLang === 'fr' ? 'Fransızca' : 'İngilizce';
+    const langName =
+      targetLang === 'nl'
+        ? 'Flamanca'
+        : targetLang === 'fr'
+        ? 'Fransızca'
+        : 'İngilizce';
+
     setIsLoading(true);
     setLoadingAction(`translate_${targetLang}`);
-    addToast('İşleniyor...', `Metin çevriliyor (TR ↔ ${targetLang.toUpperCase()})...`, '#16a085');
 
     try {
       const res = await fetch('/api/translate', {
@@ -353,28 +397,41 @@ export const App: React.FC = () => {
       const data = await res.json();
       const translated = data.translated;
 
-      let newFullText = translated;
-      if (selectedRange) {
-        newFullText =
-          text.substring(0, selectedRange.start) +
-          translated +
-          text.substring(selectedRange.end);
-      }
-      setText(newFullText);
-      setLastDiff({ original: targetText, modified: translated, title: `Çeviri (${targetLang.toUpperCase()})` });
+      // Update history
+      const actionType: 'translate_en' | 'translate_fr' | 'translate_nl' =
+        targetLang === 'nl'
+          ? 'translate_nl'
+          : targetLang === 'fr'
+          ? 'translate_fr'
+          : 'translate_en';
+
       setHistory((prev) => [
         {
           id: Math.random().toString(),
           timestamp: new Date(),
-          action: targetLang === 'fr' ? 'translate_fr' : 'translate_en',
+          action: actionType,
           originalText: targetText,
           resultText: translated,
           changed: true,
+          provider: data.provider,
         },
         ...prev.slice(0, 20),
       ]);
 
-      addToast(`Çeviri Tamamlandı! (${targetLang.toUpperCase()})`, translated, '#16a085');
+      if (settings.auto_copy_on_action) {
+        navigator.clipboard?.writeText(translated).catch(() => {});
+      }
+
+      // Open centered adaptive floating window with the translated text (selectable and copyable)
+      // Replacing the tiny bottom-right toast per user request
+      setTranslationModal({
+        isOpen: true,
+        originalText: targetText,
+        translatedText: translated,
+        targetLang,
+        provider: data.provider,
+      });
+
     } catch (err: any) {
       addToast('Çeviri Hatası', err.message || 'Çeviri gerçekleştirilemedi.', '#e74c3c');
     } finally {
@@ -382,6 +439,24 @@ export const App: React.FC = () => {
       setLoadingAction(null);
       setSelectionMenuPos(null);
     }
+  };
+
+  // Metin editörüne çeviriyi aktarma
+  const handleApplyTranslationToEditor = (translatedText: string) => {
+    let newFullText = translatedText;
+    if (selectedRange) {
+      newFullText =
+        text.substring(0, selectedRange.start) +
+        translatedText +
+        text.substring(selectedRange.end);
+    }
+    setText(newFullText);
+    setLastDiff({
+      original: translationModal.originalText,
+      modified: translatedText,
+      title: `Çeviri (${translationModal.targetLang.toUpperCase()})`,
+    });
+    addToast('Editöre Aktarıldı', 'Çevrilen metin yazı alanına aktarıldı.', settings.color_theme);
   };
 
   // 5. Sesle Yazma Tamamlandığında
@@ -627,6 +702,7 @@ export const App: React.FC = () => {
                   onImprove={handleImproveText}
                   onTranslateEn={handleTranslateEn}
                   onTranslateFr={handleTranslateFr}
+                  onTranslateNl={handleTranslateNl}
                   onRecordAudio={() => setIsAudioModalOpen(true)}
                   onCopy={handleCopy}
                   position={selectionMenuPos}
@@ -685,6 +761,16 @@ export const App: React.FC = () => {
                 >
                   <Globe className="w-3.5 h-3.5" />
                   <span>Çevir (FR)</span>
+                </button>
+
+                <button
+                  onClick={handleTranslateNl}
+                  disabled={isLoading}
+                  className="px-3 py-1.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-orange-300 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40"
+                  title="Flamancaya / Türkçeye Çevir (Hollandaca)"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Çevir (NL)</span>
                 </button>
 
                 <button
@@ -830,6 +916,8 @@ export const App: React.FC = () => {
                           ? 'Çeviri (EN)'
                           : item.action === 'translate_fr'
                           ? 'Çeviri (FR)'
+                          : item.action === 'translate_nl'
+                          ? 'Çeviri (NL)'
                           : 'Sesle Yazma'}
                       </span>
                       <span className="text-[10px] text-slate-500 font-mono">
@@ -866,6 +954,14 @@ export const App: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Centered Floating Translation Result Window */}
+      <TranslationResultModal
+        data={translationModal}
+        themeColor={settings.color_theme}
+        onClose={() => setTranslationModal((prev) => ({ ...prev, isOpen: false }))}
+        onApplyToEditor={handleApplyTranslationToEditor}
+      />
 
       {/* Floating Notifications mimicking Windows WPF NotificationWindow */}
       <NotificationToast toasts={toasts} onDismiss={dismissToast} />

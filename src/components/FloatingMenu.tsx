@@ -7,6 +7,7 @@ interface FloatingMenuProps {
   onImprove: () => void;
   onTranslateEn: () => void;
   onTranslateFr: () => void;
+  onTranslateNl: () => void;
   onRecordAudio: () => void;
   onCopy: () => void;
   position?: { top: number; left: number } | null;
@@ -21,6 +22,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
   onImprove,
   onTranslateEn,
   onTranslateFr,
+  onTranslateNl,
   onRecordAudio,
   onCopy,
   position,
@@ -114,6 +116,23 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
             </span>
           </div>
           <span className="sr-only">Fransızca Çevir</span>
+        </button>
+
+        {/* Çevir NL (Türkçe ↔ Flamanca / Hollandaca) */}
+        <button
+          type="button"
+          onClick={onTranslateNl}
+          disabled={isLoading}
+          title="Çevir (Türkçe ↔ Flamanca / Hollandaca)"
+          className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center"
+        >
+          <div className="relative">
+            <Globe className="w-4 h-4 text-orange-400 group-hover:scale-110 transition-transform" />
+            <span className="absolute -bottom-1 -right-2 text-[8px] font-bold bg-orange-600 text-white rounded px-0.5 leading-none py-0.5">
+              NL
+            </span>
+          </div>
+          <span className="sr-only">Flamanca Çevir</span>
         </button>
 
         <div className="w-[1px] h-5 bg-white/20 mx-0.5" />

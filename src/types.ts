@@ -13,6 +13,7 @@ export interface AppSettings {
   translation_provider: 'free' | 'gemini';
   translation_email: string;
   improve_provider: 'auto' | 'free' | 'gemini';
+  auto_copy_on_action: boolean;
   hasGeminiKey?: boolean;
 }
 
@@ -27,9 +28,17 @@ export interface ToastMessage {
 export interface HistoryItem {
   id: string;
   timestamp: Date;
-  action: 'deasciify' | 'improve' | 'translate_en' | 'translate_fr' | 'stt';
+  action: 'deasciify' | 'improve' | 'translate_en' | 'translate_fr' | 'translate_nl' | 'stt';
   originalText: string;
   resultText: string;
   changed: boolean;
+  provider?: string;
+}
+
+export interface TranslationModalState {
+  isOpen: boolean;
+  originalText: string;
+  translatedText: string;
+  targetLang: 'en' | 'fr' | 'nl';
   provider?: string;
 }

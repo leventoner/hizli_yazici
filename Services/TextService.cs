@@ -202,14 +202,15 @@ namespace YaziciCS.Services
             if (string.IsNullOrWhiteSpace(text)) return text;
 
             bool isFrench = targetLanguage.Equals("fr", StringComparison.OrdinalIgnoreCase);
+            bool isDutch = targetLanguage.Equals("nl", StringComparison.OrdinalIgnoreCase);
 
             string provider = SettingsManager.Current.TranslationProvider ?? "free";
             if (provider.Equals("free", StringComparison.OrdinalIgnoreCase))
             {
-                return await FreeTranslationService.TranslateAsync(text, isFrench ? "fr" : "en");
+                return await FreeTranslationService.TranslateAsync(text, isDutch ? "nl" : (isFrench ? "fr" : "en"));
             }
 
-            string targetLangName = isFrench ? "French" : "English";
+            string targetLangName = isDutch ? "Dutch (Flemish / Nederlands)" : (isFrench ? "French" : "English");
             string prompt = $"You are a translator. Analyze the language of the text between triple quotes below.\n" +
                 $"- If the text is in Turkish, translate it into natural, fluent {targetLangName}.\n" +
                 $"- If the text is in {targetLangName} (or any other language), translate it into natural, fluent Turkish.\n" +
@@ -220,5 +221,6 @@ namespace YaziciCS.Services
         }
 
         public static Task<string> TranslateFrenchTextAsync(string text) => TranslateTextAsync(text, "fr");
+        public static Task<string> TranslateDutchTextAsync(string text) => TranslateTextAsync(text, "nl");
     }
 }
