@@ -14,6 +14,7 @@ interface FloatingMenuProps {
   isFloating?: boolean;
   isLoading?: boolean;
   copied?: boolean;
+  isSingleWord?: boolean;
 }
 
 export const FloatingMenu: React.FC<FloatingMenuProps> = ({
@@ -29,6 +30,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
   isFloating = false,
   isLoading = false,
   copied = false,
+  isSingleWord = false,
 }) => {
   const style: React.CSSProperties = isFloating && position
     ? {
@@ -84,12 +86,12 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
           <span className="sr-only">Metni İyileştir</span>
         </button>
 
-        {/* Çevir EN (Türkçe ↔ İngilizce) */}
+        {/* Çevir EN (Türkçe ↔ İngilizce / Sözlük) */}
         <button
           type="button"
           onClick={onTranslateEn}
           disabled={isLoading}
-          title="Çevir (Türkçe ↔ İngilizce)"
+          title={isSingleWord ? "Sözlükte Kelime Anlamı & Çeviri (EN)" : "Çevir (Türkçe ↔ İngilizce)"}
           className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center"
         >
           <div className="relative">
@@ -98,15 +100,15 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
               EN
             </span>
           </div>
-          <span className="sr-only">İngilizce Çevir</span>
+          <span className="sr-only">İngilizce Çevir / Sözlük</span>
         </button>
 
-        {/* Çevir FR (Türkçe ↔ Fransızca) */}
+        {/* Çevir FR (Türkçe ↔ Fransızca / Sözlük) */}
         <button
           type="button"
           onClick={onTranslateFr}
           disabled={isLoading}
-          title="Çevir (Türkçe ↔ Fransızca)"
+          title={isSingleWord ? "Sözlükte Kelime Anlamı & Çeviri (FR)" : "Çevir (Türkçe ↔ Fransızca)"}
           className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center"
         >
           <div className="relative">
@@ -115,15 +117,15 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
               FR
             </span>
           </div>
-          <span className="sr-only">Fransızca Çevir</span>
+          <span className="sr-only">Fransızca Çevir / Sözlük</span>
         </button>
 
-        {/* Çevir NL (Türkçe ↔ Flamanca / Hollandaca) */}
+        {/* Çevir NL (Türkçe ↔ Flamanca / Hollandaca / Sözlük) */}
         <button
           type="button"
           onClick={onTranslateNl}
           disabled={isLoading}
-          title="Çevir (Türkçe ↔ Flamanca / Hollandaca)"
+          title={isSingleWord ? "Sözlükte Kelime Anlamı & Çeviri (NL)" : "Çevir (Türkçe ↔ Flamanca / Hollandaca)"}
           className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center"
         >
           <div className="relative">
@@ -132,7 +134,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
               NL
             </span>
           </div>
-          <span className="sr-only">Flamanca Çevir</span>
+          <span className="sr-only">Flamanca Çevir / Sözlük</span>
         </button>
 
         <div className="w-[1px] h-5 bg-white/20 mx-0.5" />

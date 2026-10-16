@@ -25,6 +25,7 @@ import { NotificationToast } from './components/NotificationToast';
 import { AudioRecorderModal } from './components/AudioRecorderModal';
 import { DiffViewer } from './components/DiffViewer';
 import { TranslationResultModal } from './components/TranslationResultModal';
+import { extractSingleWord } from './services/dictionaryService';
 
 const PRESETS = [
   {
@@ -68,6 +69,13 @@ const PRESETS = [
     badge: 'TR ↔ NL',
     color: '#f97316',
     text: 'Goedemorgen, het weer in Amsterdam is vandaag erg aangenaam en zonnig. We gaan samen een wandeling maken.',
+  },
+  {
+    label: 'Sözlük Modu (Örn: "filmi")',
+    description: 'Tek bir sözcük seçildiğinde çalışan akıllı sözlük',
+    badge: '📖 Sözlük',
+    color: '#10b981',
+    text: 'Dün akşam arkadaşlarla bu harika filmi izledim ve hikayesinden çok etkilendim.',
   },
 ];
 
@@ -396,6 +404,8 @@ export const App: React.FC = () => {
 
       const data = await res.json();
       const translated = data.translated;
+      const isDict = Boolean(data.isDictionary);
+      const dictData = data.dictionary || null;
 
       // Update history
       const actionType: 'translate_en' | 'translate_fr' | 'translate_nl' =
@@ -411,9 +421,10 @@ export const App: React.FC = () => {
           timestamp: new Date(),
           action: actionType,
           originalText: targetText,
-          resultText: translated,
+          resultText: isDict && dictData?.rootWord ? `${dictData.rootWord}: ${translated}` : translated,
           changed: true,
           provider: data.provider,
+          isDictionary: isDict,
         },
         ...prev.slice(0, 20),
       ]);
@@ -422,7 +433,7 @@ export const App: React.FC = () => {
         navigator.clipboard?.writeText(translated).catch(() => {});
       }
 
-      // Open centered adaptive floating window with the translated text (selectable and copyable)
+      // Open centered adaptive floating window with the translated text / dictionary analysis
       // Replacing the tiny bottom-right toast per user request
       setTranslationModal({
         isOpen: true,
@@ -430,6 +441,8 @@ export const App: React.FC = () => {
         translatedText: translated,
         targetLang,
         provider: data.provider,
+        isDictionary: isDict,
+        dictionaryData: dictData,
       });
 
     } catch (err: any) {
@@ -709,6 +722,11 @@ export const App: React.FC = () => {
                   isFloating={true}
                   isLoading={isLoading}
                   copied={copied}
+                  isSingleWord={Boolean(
+                    extractSingleWord(
+                      selectedRange ? text.substring(selectedRange.start, selectedRange.end) : text
+                    )
+                  )}
                 />
               )}
             </div>

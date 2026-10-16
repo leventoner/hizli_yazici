@@ -68,7 +68,7 @@
                         <Border x:Name="LangBadge" CornerRadius="6" Padding="6,2" Margin="0,0,10,0" Background="#2563EB">
                             <TextBlock x:Name="TxtLang" Text="TR ➔ EN" FontWeight="Bold" FontSize="11" Foreground="White" FontFamily="Segoe UI"/>
                         </Border>
-                        <TextBlock Text="Çeviri Sonucu" FontWeight="SemiBold" FontSize="14" Foreground="#E2E8F0" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                        <TextBlock x:Name="TxtTitle" Text="Çeviri Sonucu" FontWeight="SemiBold" FontSize="14" Foreground="#E2E8F0" VerticalAlignment="Center" FontFamily="Segoe UI"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">

@@ -25,6 +25,30 @@ export interface ToastMessage {
   timestamp: number;
 }
 
+export interface DictionaryExample {
+  source: string;
+  target: string;
+}
+
+export interface DictionaryMeaning {
+  meaning: string;
+  partOfSpeech?: string;
+  definition?: string;
+  examples?: DictionaryExample[];
+}
+
+export interface DictionaryEntry {
+  originalWord: string;
+  rootWord: string;
+  partOfSpeech: string;
+  phonetic?: string;
+  grammaticalNote?: string;
+  meanings: DictionaryMeaning[];
+  synonyms?: string[];
+  targetLang: 'en' | 'fr' | 'nl';
+  sourceLang?: string;
+}
+
 export interface HistoryItem {
   id: string;
   timestamp: Date;
@@ -33,6 +57,7 @@ export interface HistoryItem {
   resultText: string;
   changed: boolean;
   provider?: string;
+  isDictionary?: boolean;
 }
 
 export interface TranslationModalState {
@@ -41,4 +66,6 @@ export interface TranslationModalState {
   translatedText: string;
   targetLang: 'en' | 'fr' | 'nl';
   provider?: string;
+  isDictionary?: boolean;
+  dictionaryData?: DictionaryEntry | null;
 }

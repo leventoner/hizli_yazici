@@ -8,6 +8,7 @@ import { GoogleGenAI } from '@google/genai';
 import { Deasciifier } from './src/services/deasciifier.js';
 import { translateFree } from './src/services/freeTranslation.js';
 import { improveTurkishTextFree } from './src/services/freeTextImprover.js';
+import { extractSingleWord, lookupDictionary } from './src/services/dictionaryService.js';
 
 dotenv.config();
 
@@ -260,6 +261,38 @@ app.post('/api/translate', async (req, res) => {
         ? 'French'
         : 'English';
 
+    // 1. Check if input is a single word -> Trigger Dictionary Mode
+    const singleWord = extractSingleWord(text);
+    if (singleWord) {
+      let geminiAi: GoogleGenAI | undefined;
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          geminiAi = getGeminiClient();
+        } catch (err) {
+          console.warn('Gemini client init failed for dictionary:', err);
+        }
+      }
+
+      const dictEntry = await lookupDictionary(
+        singleWord,
+        (lang === 'fr' || lang === 'nl' ? lang : 'en') as 'en' | 'fr' | 'nl',
+        geminiAi,
+        settings.translation_email
+      );
+
+      const primaryTranslation = dictEntry.meanings[0]?.meaning || dictEntry.rootWord;
+
+      return res.json({
+        original: text,
+        translated: primaryTranslation,
+        targetLanguage: lang,
+        provider: geminiAi ? 'gemini' : 'free',
+        isDictionary: true,
+        dictionary: dictEntry,
+      });
+    }
+
+    // 2. Multi-word phrases or sentences -> Normal Translation
     if (provider === 'gemini') {
       const ai = getGeminiClient();
       const prompt =
@@ -292,17 +325,19 @@ app.post('/api/translate', async (req, res) => {
         translated,
         targetLanguage: lang,
         provider: 'gemini',
+        isDictionary: false,
       });
     }
 
     // Default to free translation
     try {
       const translated = await translateFree(text, lang, settings.translation_email);
-      res.json({
+      return res.json({
         original: text,
         translated,
         targetLanguage: lang,
         provider: 'free',
+        isDictionary: false,
       });
     } catch (freeErr: any) {
       if (process.env.GEMINI_API_KEY) {
@@ -324,6 +359,7 @@ app.post('/api/translate', async (req, res) => {
           translated,
           targetLanguage: lang,
           provider: 'gemini-fallback',
+          isDictionary: false,
         });
       }
       throw freeErr;
@@ -331,6 +367,38 @@ app.post('/api/translate', async (req, res) => {
   } catch (err: any) {
     console.error('Translate error:', err);
     res.status(500).json({ error: err.message || 'Çeviri sırasında hata oluştu.' });
+  }
+});
+
+// Explicit Dictionary endpoint
+app.post('/api/dictionary', async (req, res) => {
+  try {
+    const { word, targetLanguage = 'en' } = req.body;
+    if (!word || typeof word !== 'string') {
+      return res.status(400).json({ error: 'Kelime parametresi zorunludur.' });
+    }
+
+    const lang = targetLanguage.toLowerCase() as 'en' | 'fr' | 'nl';
+    let geminiAi: GoogleGenAI | undefined;
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        geminiAi = getGeminiClient();
+      } catch {}
+    }
+
+    const dictEntry = await lookupDictionary(
+      word,
+      lang === 'fr' || lang === 'nl' ? lang : 'en',
+      geminiAi,
+      settings.translation_email
+    );
+
+    res.json({
+      success: true,
+      entry: dictEntry,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Sözlük araması sırasında hata oluştu.' });
   }
 });
 

@@ -26,6 +26,16 @@ namespace YaziciCS.UI
             TxtResult.Text = translatedText;
             TxtLang.Text = langPair;
 
+            // Check if single word for dictionary mode
+            if (!string.IsNullOrWhiteSpace(originalText) && !originalText.Trim().Contains(" "))
+            {
+                TxtTitle.Text = "📖 Sözlük & Anlam Analizi";
+            }
+            else
+            {
+                TxtTitle.Text = "Çeviri Sonucu";
+            }
+
             // Set badge color based on language
             if (langPair.Contains("NL") || langPair.Contains("Flamanca") || langPair.Contains("Hollandaca"))
             {
