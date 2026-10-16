@@ -21,6 +21,48 @@ namespace YaziciCS.UI
             this.langPair = langPair ?? "Çeviri";
         }
 
+        /// <summary>
+        /// Refreshes the window content with a new translation result.
+        /// Used when reusing an existing single result window instead of opening a new one.
+        /// </summary>
+        public void UpdateContent(string originalText, string translatedText, string langPair)
+        {
+            TxtResult.Text = translatedText ?? "";
+            TxtLang.Text = langPair ?? "Çeviri";
+
+            // Single word -> dictionary mode (automatic, no button needed)
+            if (!string.IsNullOrWhiteSpace(originalText) && !originalText.Trim().Contains(" "))
+            {
+                TxtTitle.Text = "📖 Sözlük & Anlam Analizi";
+            }
+            else
+            {
+                TxtTitle.Text = "Çeviri Sonucu";
+            }
+
+            // Set badge color based on language
+            if (langPair.Contains("NL") || langPair.Contains("Flamanca") || langPair.Contains("Hollandaca"))
+            {
+                LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EA580C")); // Dutch Orange
+            }
+            else if (langPair.Contains("FR") || langPair.Contains("Fransızca"))
+            {
+                LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")); // French Red
+            }
+            else
+            {
+                LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB")); // English Blue
+            }
+
+            int charCount = (translatedText ?? "").Length;
+            int wordCount = Regex.Split((translatedText ?? "").Trim(), @"\s+").Length;
+            if (string.IsNullOrWhiteSpace(translatedText)) wordCount = 0;
+
+            TxtStats.Text = $"{charCount} karakter • {wordCount} kelime";
+
+            TxtResult.Focus();
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             TxtResult.Text = translatedText;

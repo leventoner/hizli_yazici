@@ -14,6 +14,7 @@ namespace YaziciCS
         private NotifyIcon? notifyIcon;
         private FloatingMenu? floatingMenu;
         private SettingsWindow? settingsWindow;
+        private TranslationResultWindow? translationResultWindow;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -32,14 +33,24 @@ namespace YaziciCS
                 });
             };
 
-            // Setup Translation Result Window handler (centered, dynamic sizing, selectable & copyable)
+            // Setup Translation Result Window handler (centered, dynamic sizing, selectable & copyable).
+            // Only ONE result window is allowed at a time. Reuse the existing window if open,
+            // otherwise create a new one. When closed, clear the reference so a new one can be created.
             ActionHandler.ShowTranslationResult = (originalText, translatedText, langPair) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    var resultWin = new TranslationResultWindow(originalText, translatedText, langPair);
-                    resultWin.Show();
-                    resultWin.Activate();
+                    if (translationResultWindow == null || !translationResultWindow.IsLoaded)
+                    {
+                        translationResultWindow = new TranslationResultWindow(originalText, translatedText, langPair);
+                        translationResultWindow.Closed += (s, e) => translationResultWindow = null;
+                        translationResultWindow.Show();
+                    }
+                    else
+                    {
+                        translationResultWindow.UpdateContent(originalText, translatedText, langPair);
+                        translationResultWindow.Activate();
+                    }
                 });
             };
 
