@@ -121,6 +121,52 @@ namespace YaziciCS.Services
             };
         }
 
+        /// <summary>
+        /// Gemini'den serbest metin yerine ham yanıt (ör. sözlük için JSON) döndürür.
+        /// Tüm model zincirini dener; hiçbiri başarılı olmazsa boş string döner.
+        /// </summary>
+        internal static async Task<string> CallGeminiRawAsync(string prompt, string operation, int timeoutSeconds = 10)
+        {
+            if (string.IsNullOrWhiteSpace(prompt)) return "";
+
+            string apiKey = SettingsManager.Current.GeminiApiKey;
+            if (string.IsNullOrEmpty(apiKey)) return "";
+
+            var prioritized = GetPrioritizedModels();
+            foreach (var modelResourceName in prioritized)
+            {
+                var attemptTimer = System.Diagnostics.Stopwatch.StartNew();
+                string modelUrl = modelResourceName.StartsWith("models/") ? modelResourceName : $"models/{modelResourceName}";
+                string uri = $"https://generativelanguage.googleapis.com/v1beta/{modelUrl}:generateContent?key={apiKey}";
+                var requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
+
+                try
+                {
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                    var response = await HttpClient.PostAsync(uri, new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"), cts.Token);
+                    string responseString = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using JsonDocument doc = JsonDocument.Parse(responseString);
+                        string? text = doc.RootElement.GetProperty("candidates")[0]
+                            .GetProperty("content").GetProperty("parts")[0]
+                            .GetProperty("text").GetString();
+                        LogModelAttempt(operation, modelResourceName, "success", attemptTimer.ElapsedMilliseconds);
+                        return text?.Trim() ?? "";
+                    }
+
+                    LogModelAttempt(operation, modelResourceName, $"http-{(int)response.StatusCode}", attemptTimer.ElapsedMilliseconds);
+                }
+                catch
+                {
+                    LogModelAttempt(operation, modelResourceName, "exception", attemptTimer.ElapsedMilliseconds);
+                }
+            }
+
+            return "";
+        }
+
         internal static TimeSpan GetModelRetryDelay(int retryCount)
         {
             return TimeSpan.FromSeconds(Math.Min(10, Math.Pow(2, Math.Min(retryCount, 3))));
@@ -200,6 +246,15 @@ namespace YaziciCS.Services
         public static async Task<string> TranslateTextAsync(string text, string targetLanguage = "en")
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
+
+            // Tek kelime seçildiyse → otomatik sözlük modu (web sürümüyle aynı davranış).
+            // Cümleler normal çeviriye gider; tek kelimeler kök analizi + anlam içerir.
+            string? singleWord = DictionaryService.ExtractSingleWord(text);
+            if (singleWord != null)
+            {
+                DictionaryEntry entry = await DictionaryService.LookupAsync(singleWord, targetLanguage);
+                return DictionaryService.FormatEntry(entry);
+            }
 
             bool isFrench = targetLanguage.Equals("fr", StringComparison.OrdinalIgnoreCase);
             bool isDutch = targetLanguage.Equals("nl", StringComparison.OrdinalIgnoreCase);

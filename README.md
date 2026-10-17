@@ -7,6 +7,7 @@ Hızlı Yazıcı, Windows'ta seçtiğiniz metni düzeltmenize, iyileştirmenize 
 - **Türkçe karakter düzeltme:** `guzel`, `sirket` gibi Türkçe karakterleri eksik yazılmış kelimeleri yerel olarak düzeltmeye çalışır. Bu özellik için internet bağlantısı veya API anahtarı gerekmez.
 - **Metin iyileştirme:** Gemini metnin dilini koruyarak yazım, noktalama, dilbilgisi ve akıcılık üzerinde çalışır. Metin Gemini API'ye gönderilir.
 - **Çeviri:** Türkçe metni İngilizceye, diğer dillerdeki metni Türkçeye çevirir. Varsayılan ücretsiz mod önce Google'ın anahtarsız çeviri uç noktasını, yanıt alınamazsa MyMemory servisini dener. İsterseniz ayarlardan Gemini sağlayıcısını seçebilirsiniz. Kaynak metin seçilen sağlayıcıya gönderilir.
+- **Sözlük (tek kelime):** Çeviri için **tek bir kelime** seçtiğinizde otomatik olarak sözlük moduna geçilir. Kelime Türkçe veya yabancı olabilir; Gemini varsa kök (lemma) analizi, ek/dilbilgisi notu, anlam(lar), örnek cümleler ve eş anlamlılar üretilir. Gemini anahtarı yoksa ücretsiz ek analizi + ücretsiz çeviri ile temel bir giriş gösterilir. Sonuç, seçilebilir ve kopyalanabilir bir pencerede sunulur.
 - **Sesle yazma:** Mikrofon kaydını Gemini'ye göndererek metne dönüştürür. Kayıt süresi ve global kısayol ayarlanabilir. Ses işleme için Gemini API anahtarı ve mikrofon erişimi gerekir.
 - **Yüzer menü ve tepsi:** Metin seçtiğinizde düzeltme, iyileştirme ve çeviri seçenekleri sunan menü açılır. Uygulama tepsi simgesinden ayarlanabilir veya kapatılabilir; ana pencere kapalıyken de tepside çalışmaya devam eder.
 
