@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Çeviri Sonucu"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="True" WindowStartupLocation="CenterScreen"
+        Topmost="False" ShowInTaskbar="True" WindowStartupLocation="CenterScreen"
         SizeToContent="WidthAndHeight"
         MinWidth="440" MaxWidth="780" MinHeight="200" MaxHeight="560"
         Loaded="Window_Loaded" KeyDown="Window_KeyDown">
