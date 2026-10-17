@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using YaziciCS.Managers;
 
 namespace YaziciCS.Services
@@ -33,6 +37,7 @@ namespace YaziciCS.Services
         public string TargetLang { get; set; } = "en";
         public string SourceLang { get; set; } = "";
         public bool IsFromAi { get; set; }
+        public string? UsedModel { get; set; }
     }
 
     /// <summary>
@@ -77,19 +82,33 @@ namespace YaziciCS.Services
 
                 try
                 {
-                    string json = await TextService.CallGeminiRawAsync(prompt, "dictionary", 15);
+                    (string json, string? usedModel) = await TextService.CallGeminiRawAsync(prompt, "dictionary", 15);
                     if (!string.IsNullOrWhiteSpace(json))
                     {
                         DictionaryEntry? parsed = TryParseEntry(json, cleanWord, lang);
-                        if (parsed != null) return parsed;
+                        if (parsed != null)
+                        {
+                            parsed.UsedModel = usedModel;
+                            LastEntry = parsed;
+                            return parsed;
+                        }
                     }
                 }
                 catch { /* sessizce yedeğe düş */ }
             }
 
             // 2. Ücretsiz yedek: ek analizi + ücretsiz çeviri
-            return BuildFallbackEntry(cleanWord, lang);
+            var fallback = BuildFallbackEntry(cleanWord, lang);
+            LastEntry = fallback;
+            return fallback;
         }
+
+        /// <summary>
+        /// En son üretilen sözlük girişi. TranslationResultWindow, tek kelime
+        /// algıladığında bu kaydı alıp renkli FlowDocument'ı tekrar API'ye
+        /// başvurmadan (çift çağrı olmadan) çizer.
+        /// </summary>
+        public static DictionaryEntry? LastEntry { get; private set; }
 
         private static string LangDisplayName(string lang) => lang switch
         {
@@ -334,9 +353,184 @@ namespace YaziciCS.Services
 
             sb.AppendLine();
             sb.Append(entry.IsFromAi
-                ? "🤖 Gemini AI ile üretildi"
+                ? (string.IsNullOrEmpty(entry.UsedModel)
+                    ? "🤖 Gemini AI ile üretildi"
+                    : $"🤖 Gemini AI ile üretildi ({NormalizeModelName(entry.UsedModel)})")
                 : "⚠️ Ücretsiz yedek analiz (Gemini kullanılamadı)");
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// Model adını sunuma uygun kısa biçime çevirir (ör. "models/gemini-3.8-flash" → "Gemini 3.8 Flash").
+        /// </summary>
+        internal static string NormalizeModelName(string? model)
+        {
+            if (string.IsNullOrWhiteSpace(model)) return "";
+            string m = model.StartsWith("models/") ? model["models/".Length..] : model;
+            m = m.Replace("gemini-", "", StringComparison.OrdinalIgnoreCase);
+            m = m.Replace("-", " ");
+            return "Gemini " + m;
+        }
+
+        // ---- Renkli akış (FlowDocument) için palet ----
+        private static readonly Color ColorHeading = Color.FromRgb(0x93, 0xC5, 0xFD);   // açık mavi başlık
+        private static readonly Color ColorLabel = Color.FromRgb(0x7D, 0xD3, 0xFC);      // cyan etiket
+        private static readonly Color ColorValue = Color.FromRgb(0xF8, 0xFA, 0xFC);      // beyaz değer
+        private static readonly Color ColorBadgeText = Color.FromRgb(0x0A, 0x0F, 0x1E);  // rozet içi koyu
+        private static readonly Color ColorBadgeBg = Color.FromRgb(0xBA, 0xE6, 0xFD);    // rozet zemini
+        private static readonly Color ColorBody = Color.FromRgb(0xE2, 0xE8, 0xF0);       // gövde
+        private static readonly Color ColorExample = Color.FromRgb(0x86, 0xEF, 0xAC);    // yeşil hedef-dil örneği
+        private static readonly Color ColorMuted = Color.FromRgb(0x94, 0xA3, 0xB8);      // soluk not
+        private static readonly Color ColorWarn = Color.FromRgb(0xFB, 0xBF, 0x24);       // sarı uyarı
+
+        private static Run MakeRun(string text, double size, Color color, FontWeight? weight = null, bool italic = false)
+        {
+            var run = new Run(text)
+            {
+                FontSize = size,
+                Foreground = new SolidColorBrush(color),
+                FontFamily = new FontFamily("Segoe UI")
+            };
+            if (weight.HasValue) run.FontWeight = weight.Value;
+            if (italic) run.FontStyle = FontStyles.Italic;
+            return run;
+        }
+
+        private static Paragraph MakeParagraph(double spaceBefore = 0, double spaceAfter = 4)
+        {
+            return new Paragraph
+            {
+                Margin = new Thickness(0, spaceBefore, 0, spaceAfter),
+                LineHeight = 21
+            };
+        }
+
+        private static void AddBadge(Paragraph p, string text, double size = 12.5)
+        {
+            var border = new Border
+            {
+                Background = new SolidColorBrush(ColorBadgeBg),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 1, 6, 1),
+                Margin = new Thickness(4, 0, 2, 0),
+                Child = new TextBlock
+                {
+                    Text = text,
+                    FontSize = size,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(ColorBadgeText),
+                    FontFamily = new FontFamily("Segoe UI")
+                }
+            };
+            p.Inlines.Add(new InlineUIContainer(border) { BaselineAlignment = BaselineAlignment.Bottom });
+        }
+
+        /// <summary>
+        /// Sözlük girişini başlıkları ve kelime türü rozetleri renklendirilmiş,
+        /// seçilebilir bir FlowDocument olarak üretir (TranslationResultWindow için).
+        /// </summary>
+        public static FlowDocument BuildFlowDocument(DictionaryEntry entry)
+        {
+            var doc = new FlowDocument
+            {
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 14.5,
+                Foreground = new SolidColorBrush(ColorBody),
+                PagePadding = new Thickness(0),
+                LineHeight = 21
+            };
+
+            // Başlık: kelime + telaffuz
+            var head = MakeParagraph(spaceAfter: 2);
+            head.Inlines.Add(MakeRun("📖  ", 18, ColorLabel));
+            head.Inlines.Add(MakeRun(entry.OriginalWord, 20, ColorHeading, FontWeights.Bold));
+            if (!string.IsNullOrEmpty(entry.Phonetic))
+                head.Inlines.Add(MakeRun("   " + entry.Phonetic, 13.5, ColorMuted, italic: true));
+            doc.Blocks.Add(head);
+
+            void AddInfoLine(string label, string value, Color valueColor, FontWeight? valueWeight = null, bool italic = false)
+            {
+                var p = MakeParagraph(spaceAfter: 3);
+                p.Inlines.Add(MakeRun(label + ": ", 13.5, ColorLabel, FontWeights.SemiBold));
+                p.Inlines.Add(MakeRun(value, 14.5, valueColor, valueWeight, italic));
+                doc.Blocks.Add(p);
+            }
+
+            AddInfoLine("Kök (root)", entry.RootWord, ColorValue, FontWeights.Bold);
+            if (!string.IsNullOrEmpty(entry.GrammaticalNote))
+                AddInfoLine("Ek analizi", entry.GrammaticalNote, ColorMuted, italic: true);
+            AddInfoLine("Sözcük türü", entry.PartOfSpeech, ColorValue);
+
+            string src = string.IsNullOrEmpty(entry.SourceLang)
+                ? entry.TargetLang.ToUpperInvariant()
+                : $"{entry.SourceLang.ToUpperInvariant()} → {entry.TargetLang.ToUpperInvariant()}";
+            var pairLine = MakeParagraph(spaceBefore: 6, spaceAfter: 6);
+            pairLine.Inlines.Add(MakeRun("Karşılık ", 13.5, ColorLabel, FontWeights.SemiBold));
+            pairLine.Inlines.Add(MakeRun($"({src})", 13.5, ColorValue, FontWeights.Bold));
+            pairLine.Inlines.Add(MakeRun(":", 13.5, ColorLabel, FontWeights.SemiBold));
+            doc.Blocks.Add(pairLine);
+
+            // Anlamlar (numara + kelime türü rozeti + anlam)
+            int meaningNo = 1;
+            foreach (var meaning in entry.Meanings)
+            {
+                var m = MakeParagraph(spaceBefore: 5, spaceAfter: 3);
+                m.Margin = new Thickness(0, 5, 0, 3);
+                m.Inlines.Add(MakeRun($"{meaningNo}. ", 14, ColorLabel, FontWeights.Bold));
+                if (!string.IsNullOrEmpty(meaning.PartOfSpeech))
+                    AddBadge(m, meaning.PartOfSpeech);
+                m.Inlines.Add(MakeRun("  " + meaning.Meaning, 15, ColorValue, FontWeights.SemiBold));
+                doc.Blocks.Add(m);
+
+                if (!string.IsNullOrEmpty(meaning.Definition))
+                {
+                    var d = MakeParagraph(spaceAfter: 4);
+                    d.Margin = new Thickness(24, 0, 0, 4);
+                    d.Inlines.Add(MakeRun(meaning.Definition, 13.5, ColorMuted, italic: true));
+                    doc.Blocks.Add(d);
+                }
+
+                foreach (var ex in meaning.Examples)
+                {
+                    var exSrc = MakeParagraph(spaceAfter: 1);
+                    exSrc.Margin = new Thickness(24, 2, 0, 1);
+                    exSrc.Inlines.Add(MakeRun("TR: ", 12.5, ColorLabel, FontWeights.SemiBold));
+                    exSrc.Inlines.Add(MakeRun(ex.Source, 13.5, ColorBody));
+                    doc.Blocks.Add(exSrc);
+
+                    var exTgt = MakeParagraph(spaceAfter: 6);
+                    exTgt.Margin = new Thickness(24, 0, 0, 6);
+                    exTgt.Inlines.Add(MakeRun($"{entry.TargetLang.ToUpperInvariant()}: ", 12.5, ColorExample, FontWeights.SemiBold));
+                    exTgt.Inlines.Add(MakeRun(ex.Target, 13.5, ColorExample));
+                    doc.Blocks.Add(exTgt);
+                }
+
+                meaningNo++;
+            }
+
+            // Eş anlamlılar
+            if (entry.Synonyms.Count > 0)
+            {
+                var syn = MakeParagraph(spaceBefore: 8, spaceAfter: 4);
+                syn.Inlines.Add(MakeRun("Eş anlamlılar: ", 13.5, ColorLabel, FontWeights.SemiBold));
+                syn.Inlines.Add(MakeRun(string.Join("  •  ", entry.Synonyms), 14, ColorValue));
+                doc.Blocks.Add(syn);
+            }
+
+            // Kaynak bilgisi (model adıyla)
+            var srcLine = MakeParagraph(spaceBefore: 10, spaceAfter: 0);
+            if (entry.IsFromAi)
+            {
+                string modelLabel = string.IsNullOrEmpty(entry.UsedModel) ? "" : $" ({NormalizeModelName(entry.UsedModel)})";
+                srcLine.Inlines.Add(MakeRun($"🤖 Gemini AI ile üretildi{modelLabel}", 13, ColorLabel, FontWeights.SemiBold));
+            }
+            else
+            {
+                srcLine.Inlines.Add(MakeRun("⚠️ Ücretsiz yedek analiz (Gemini kullanılamadı)", 13, ColorWarn, FontWeights.SemiBold));
+            }
+            doc.Blocks.Add(srcLine);
+
+            return doc;
         }
     }
 }

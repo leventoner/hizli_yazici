@@ -125,12 +125,20 @@ namespace YaziciCS.Services
         /// Gemini'den serbest metin yerine ham yanıt (ör. sözlük için JSON) döndürür.
         /// Tüm model zincirini dener; hiçbiri başarılı olmazsa boş string döner.
         /// </summary>
-        internal static async Task<string> CallGeminiRawAsync(string prompt, string operation, int timeoutSeconds = 10)
+        internal static Task<(string Text, string? UsedModel)> CallGeminiRawAsync(string prompt, string operation, int timeoutSeconds = 10)
+            => CallGeminiRawInternalAsync(prompt, operation, timeoutSeconds);
+
+        /// <summary>
+        /// Gemini'den ham yanıt döndürür; yanında kullanılan modelin adını da verir
+        /// (başarısız olursa UsedModel null kalır).
+        /// </summary>
+        private static async Task<(string Text, string? UsedModel)> CallGeminiRawInternalAsync(string prompt, string operation, int timeoutSeconds)
         {
-            if (string.IsNullOrWhiteSpace(prompt)) return "";
+            string? usedModel = null;
+            if (string.IsNullOrWhiteSpace(prompt)) return ("", null);
 
             string apiKey = SettingsManager.Current.GeminiApiKey;
-            if (string.IsNullOrEmpty(apiKey)) return "";
+            if (string.IsNullOrEmpty(apiKey)) return ("", null);
 
             var prioritized = GetPrioritizedModels();
             foreach (var modelResourceName in prioritized)
@@ -153,7 +161,7 @@ namespace YaziciCS.Services
                             .GetProperty("content").GetProperty("parts")[0]
                             .GetProperty("text").GetString();
                         LogModelAttempt(operation, modelResourceName, "success", attemptTimer.ElapsedMilliseconds);
-                        return text?.Trim() ?? "";
+                        return (text?.Trim() ?? "", modelResourceName);
                     }
 
                     LogModelAttempt(operation, modelResourceName, $"http-{(int)response.StatusCode}", attemptTimer.ElapsedMilliseconds);
@@ -164,7 +172,7 @@ namespace YaziciCS.Services
                 }
             }
 
-            return "";
+            return ("", null);
         }
 
         internal static TimeSpan GetModelRetryDelay(int retryCount)
