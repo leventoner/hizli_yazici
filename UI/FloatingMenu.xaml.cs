@@ -57,7 +57,7 @@ namespace YaziciCS.UI
         public void HideMenu()
         {
             hideTimer.Stop();
-            var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(150));
+            var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(100));
             anim.Completed += (s, e) => Hide();
             BeginAnimation(OpacityProperty, anim);
         }
@@ -65,31 +65,31 @@ namespace YaziciCS.UI
         private async void BtnFix_Click(object sender, RoutedEventArgs e)
         {
             HideMenu();
-            await ActionHandler.HandleFixClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleFixClipboardAsync(triggerCopy: true);
         }
 
         private async void BtnImprove_Click(object sender, RoutedEventArgs e)
         {
             HideMenu();
-            await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleImproveClipboardAsync(triggerCopy: true);
         }
 
         private async void BtnTranslate_Click(object sender, RoutedEventArgs e)
         {
             HideMenu();
-            await ActionHandler.HandleTranslateClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleTranslateClipboardAsync(triggerCopy: true);
         }
 
         private async void BtnTranslateFr_Click(object sender, RoutedEventArgs e)
         {
             HideMenu();
-            await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: true);
         }
 
         private async void BtnTranslateNl_Click(object sender, RoutedEventArgs e)
         {
             HideMenu();
-            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: true);
         }
 
         private async void BtnVoice_Click(object sender, RoutedEventArgs e)

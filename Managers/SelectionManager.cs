@@ -157,45 +157,9 @@ namespace YaziciCS.Managers
         {
             try
             {
-                uint oldSeq = GetClipboardSequenceNumber();
-                string oldClipboard = await Services.TextService.GetClipboardTextAsync();
-
-                // Simulate Ctrl+C with our special signature so internal copy never triggers hotkeys
-                keybd_event(VK_CONTROL, 0, 0, (UIntPtr)APP_INPUT_SIGNATURE);
-                keybd_event(VK_C, 0, 0, (UIntPtr)APP_INPUT_SIGNATURE);
-                keybd_event(VK_C, 0, KEYEVENTF_KEYUP, (UIntPtr)APP_INPUT_SIGNATURE);
-                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, (UIntPtr)APP_INPUT_SIGNATURE);
-
-                await Task.Delay(100);
-                if (reqId != currentRequestId) return;
-
-                uint newSeq = GetClipboardSequenceNumber();
-                string newClipboard = await Services.TextService.GetClipboardTextAsync();
-
-                if (string.IsNullOrWhiteSpace(newClipboard))
-                {
-                    return;
-                }
-
-                bool changed = (newSeq != oldSeq) || (newClipboard != oldClipboard);
-                if (!changed)
-                {
-                    return;
-                }
-
-                string trimmed = newClipboard.Trim();
-
-                // Requirement 2: Do not show menu if text has fewer than 3 letters.
-                // At least 3 letters are required for the menu to appear.
-                if (trimmed.Length < 3 || CountLetters(trimmed) < 3)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        menu?.HideMenu();
-                    });
-                    return;
-                }
-
+                // Just show the menu at the click position.
+                // The clipboard is NOT touched here; the selected text is copied
+                // only when the user actually picks an action from the menu.
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     if (reqId == currentRequestId)

@@ -20,11 +20,14 @@ namespace YaziciCS.Managers
 
         private static async Task SimulateCtrlC()
         {
+            // Wait for menu to hide and focus to return to the original window
+            await Task.Delay(250);
+            
             keybd_event(VK_CONTROL, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             keybd_event(VK_C, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             keybd_event(VK_C, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
-            await Task.Delay(400);
+            await Task.Delay(500);
         }
 
         public static async Task HandleFixClipboardAsync(bool triggerCopy = false)
