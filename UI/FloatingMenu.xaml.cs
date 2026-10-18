@@ -54,9 +54,13 @@ namespace YaziciCS.UI
             BeginAnimation(OpacityProperty, anim);
         }
 
-        public void HideMenu()
+        public void HideMenu(bool actionExecuted = false)
         {
             hideTimer.Stop();
+            if (!actionExecuted)
+            {
+                SelectionManager.OnMenuDismissed();
+            }
             var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(100));
             anim.Completed += (s, e) => Hide();
             BeginAnimation(OpacityProperty, anim);
@@ -64,37 +68,43 @@ namespace YaziciCS.UI
 
         private async void BtnFix_Click(object sender, RoutedEventArgs e)
         {
-            HideMenu();
-            await ActionHandler.HandleFixClipboardAsync(triggerCopy: true);
+            SelectionManager.NotifyActionExecuted();
+            HideMenu(actionExecuted: true);
+            await ActionHandler.HandleFixClipboardAsync(triggerCopy: false);
         }
 
         private async void BtnImprove_Click(object sender, RoutedEventArgs e)
         {
-            HideMenu();
-            await ActionHandler.HandleImproveClipboardAsync(triggerCopy: true);
+            SelectionManager.NotifyActionExecuted();
+            HideMenu(actionExecuted: true);
+            await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false);
         }
 
         private async void BtnTranslate_Click(object sender, RoutedEventArgs e)
         {
-            HideMenu();
-            await ActionHandler.HandleTranslateClipboardAsync(triggerCopy: true);
+            SelectionManager.NotifyActionExecuted();
+            HideMenu(actionExecuted: true);
+            await ActionHandler.HandleTranslateClipboardAsync(triggerCopy: false);
         }
 
         private async void BtnTranslateFr_Click(object sender, RoutedEventArgs e)
         {
-            HideMenu();
-            await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: true);
+            SelectionManager.NotifyActionExecuted();
+            HideMenu(actionExecuted: true);
+            await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: false);
         }
 
         private async void BtnTranslateNl_Click(object sender, RoutedEventArgs e)
         {
-            HideMenu();
-            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: true);
+            SelectionManager.NotifyActionExecuted();
+            HideMenu(actionExecuted: true);
+            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: false);
         }
 
         private async void BtnVoice_Click(object sender, RoutedEventArgs e)
         {
-            HideMenu();
+            SelectionManager.NotifyActionExecuted();
+            HideMenu(actionExecuted: true);
             await ActionHandler.HandleSpeechToTextAsync();
         }
     }

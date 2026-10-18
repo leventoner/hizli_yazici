@@ -67,9 +67,30 @@ namespace YaziciCS.Services
             return "";
         }
 
+        public static async Task ClearClipboardAsync()
+        {
+            for (int i = 0; i < 15; i++)
+            {
+                if (OpenClipboard(IntPtr.Zero))
+                {
+                    try
+                    {
+                        EmptyClipboard();
+                        return;
+                    }
+                    finally { CloseClipboard(); }
+                }
+                await Task.Delay(50);
+            }
+        }
+
         public static async Task SetClipboardTextAsync(string text)
         {
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text))
+            {
+                await ClearClipboardAsync();
+                return;
+            }
 
             for (int i = 0; i < 15; i++)
             {
