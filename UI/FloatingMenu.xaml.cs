@@ -112,37 +112,42 @@ namespace YaziciCS.UI
 
         private async void BtnFix_Click(object sender, RoutedEventArgs e)
         {
+            string? source = SelectionManager.GetSelectedText();
             SelectionManager.NotifyActionExecuted();
             HideMenu(actionExecuted: true);
-            await ActionHandler.HandleFixClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleFixClipboardAsync(triggerCopy: false, sourceText: source);
         }
 
         private async void BtnImprove_Click(object sender, RoutedEventArgs e)
         {
+            string? source = SelectionManager.GetSelectedText();
             SelectionManager.NotifyActionExecuted();
             HideMenu(actionExecuted: true);
-            await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false, sourceText: source);
         }
 
         private async void BtnTranslate_Click(object sender, RoutedEventArgs e)
         {
+            string? source = SelectionManager.GetSelectedText();
             SelectionManager.NotifyActionExecuted();
             HideMenu(actionExecuted: true);
-            await ActionHandler.HandleTranslateClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleTranslateClipboardAsync(triggerCopy: false, sourceText: source);
         }
 
         private async void BtnTranslateFr_Click(object sender, RoutedEventArgs e)
         {
+            string? source = SelectionManager.GetSelectedText();
             SelectionManager.NotifyActionExecuted();
             HideMenu(actionExecuted: true);
-            await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleTranslateFrenchClipboardAsync(triggerCopy: false, sourceText: source);
         }
 
         private async void BtnTranslateNl_Click(object sender, RoutedEventArgs e)
         {
+            string? source = SelectionManager.GetSelectedText();
             SelectionManager.NotifyActionExecuted();
             HideMenu(actionExecuted: true);
-            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: false);
+            await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: false, sourceText: source);
         }
 
         private async void BtnVoice_Click(object sender, RoutedEventArgs e)

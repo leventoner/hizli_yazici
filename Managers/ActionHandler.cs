@@ -30,13 +30,28 @@ namespace YaziciCS.Managers
             await Task.Delay(500);
         }
 
-        public static async Task HandleFixClipboardAsync(bool triggerCopy = false)
+        /// <summary>
+        /// İşlenecek metni belirler.
+        /// - sourceText verildiyse (fare ile seçim) doğrudan o kullanılır, pano okunmaz.
+        /// - sourceText yoksa pano okunur (Ctrl+C kısayolu gibi durumlar).
+        /// </summary>
+        private static async Task<string?> ResolveSourceTextAsync(bool triggerCopy, string? sourceText)
         {
-            if (!SettingsManager.Current.EnableCharacterFix) return;
+            if (!string.IsNullOrWhiteSpace(sourceText))
+            {
+                return sourceText;
+            }
 
             if (triggerCopy) await SimulateCtrlC();
 
-            string text = await TextService.GetClipboardTextAsync();
+            return await TextService.GetClipboardTextAsync();
+        }
+
+        public static async Task HandleFixClipboardAsync(bool triggerCopy = false, string? sourceText = null)
+        {
+            if (!SettingsManager.Current.EnableCharacterFix) return;
+
+            string text = await ResolveSourceTextAsync(triggerCopy, sourceText) ?? "";
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
@@ -56,11 +71,9 @@ namespace YaziciCS.Managers
             }
         }
 
-        public static async Task HandleImproveClipboardAsync(bool triggerCopy = false)
+        public static async Task HandleImproveClipboardAsync(bool triggerCopy = false, string? sourceText = null)
         {
-            if (triggerCopy) await SimulateCtrlC();
-
-            string text = await TextService.GetClipboardTextAsync();
+            string text = await ResolveSourceTextAsync(triggerCopy, sourceText) ?? "";
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
@@ -81,11 +94,9 @@ namespace YaziciCS.Managers
             }
         }
 
-        public static async Task HandleTranslateClipboardAsync(bool triggerCopy = false)
+        public static async Task HandleTranslateClipboardAsync(bool triggerCopy = false, string? sourceText = null)
         {
-            if (triggerCopy) await SimulateCtrlC();
-
-            string text = await TextService.GetClipboardTextAsync();
+            string text = await ResolveSourceTextAsync(triggerCopy, sourceText) ?? "";
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
@@ -114,11 +125,9 @@ namespace YaziciCS.Managers
             }
         }
 
-        public static async Task HandleTranslateFrenchClipboardAsync(bool triggerCopy = false)
+        public static async Task HandleTranslateFrenchClipboardAsync(bool triggerCopy = false, string? sourceText = null)
         {
-            if (triggerCopy) await SimulateCtrlC();
-
-            string text = await TextService.GetClipboardTextAsync();
+            string text = await ResolveSourceTextAsync(triggerCopy, sourceText) ?? "";
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");
@@ -147,11 +156,9 @@ namespace YaziciCS.Managers
             }
         }
 
-        public static async Task HandleTranslateDutchClipboardAsync(bool triggerCopy = false)
+        public static async Task HandleTranslateDutchClipboardAsync(bool triggerCopy = false, string? sourceText = null)
         {
-            if (triggerCopy) await SimulateCtrlC();
-
-            string text = await TextService.GetClipboardTextAsync();
+            string text = await ResolveSourceTextAsync(triggerCopy, sourceText) ?? "";
             if (string.IsNullOrWhiteSpace(text))
             {
                 ShowNotification?.Invoke("Hata", "Lütfen metni seçin ve tekrar deneyin.", "#e74c3c");

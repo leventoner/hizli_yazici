@@ -81,8 +81,13 @@ namespace YaziciCS.Managers
         private static int clickCount;
         private static int currentRequestId;
 
-        private static string? backupClipboard;
-        private static bool hasActiveSelection;
+        // Seçili metin (pano kirletilmeden, UIA veya Ctrl+C yoluyla okunur).
+        private static string? selectedText;
+
+        /// <summary>
+        /// Fare ile seçilen metni döndürür. Pano bu aşamada değiştirilmez.
+        /// </summary>
+        public static string? GetSelectedText() => selectedText;
 
         public static void Initialize(FloatingMenu floatingMenu)
         {
@@ -222,13 +227,12 @@ namespace YaziciCS.Managers
                     // En az 2 harfli kelimeleri ("ev", "su", "at", "to", "go") kabul et
                     if (trimmedUi.Length < 2 || CountLetters(trimmedUi) < 2)
                     {
+                        selectedText = null;
                         return;
                     }
 
-                    string oldClip = await TextService.GetClipboardTextAsync();
-                    backupClipboard = oldClip;
-                    hasActiveSelection = true;
-                    await TextService.SetClipboardTextAsync(trimmedUi);
+                    // ÖNEMLİ: Pano burada DEĞİŞTİRİLMEZ. Sadece seçilen metin bellekte tutulur.
+                    selectedText = trimmedUi;
 
                     double finalCenterX = uiaCenterX ?? centerX;
                     double finalTopY = uiaTopY ?? topY;
@@ -265,6 +269,7 @@ namespace YaziciCS.Managers
                 bool changed = (newSeq != oldSeq) || (newClipboard != oldClipboard);
                 if (!changed || string.IsNullOrWhiteSpace(newClipboard))
                 {
+                    selectedText = null;
                     return;
                 }
 
@@ -274,6 +279,7 @@ namespace YaziciCS.Managers
                 // En az 2 harf seçilmiş olmalı
                 if (trimmed.Length < 2 || letterCount < 2)
                 {
+                    selectedText = null;
                     if (newSeq != oldSeq)
                     {
                         await TextService.SetClipboardTextAsync(oldClipboard);
@@ -285,8 +291,15 @@ namespace YaziciCS.Managers
                     return;
                 }
 
-                backupClipboard = oldClipboard;
-                hasActiveSelection = true;
+                selectedText = trimmed;
+
+                // Pano hâlâ bizim kopyaladığımız metni içeriyorsa eski haline geri yüklenir.
+                // (Kullanıcı bu arada kendi kopyalama işlemini yaptıysa dokunulmaz.)
+                string currentClip = await TextService.GetClipboardTextAsync();
+                if (currentClip.Trim() == trimmed)
+                {
+                    await TextService.SetClipboardTextAsync(oldClipboard);
+                }
 
                 Application.Current?.Dispatcher?.BeginInvoke(() =>
                 {
@@ -409,34 +422,12 @@ namespace YaziciCS.Managers
 
         public static void NotifyActionExecuted()
         {
-            hasActiveSelection = false;
-            backupClipboard = null;
+            selectedText = null;
         }
 
         public static void OnMenuDismissed()
         {
-            if (hasActiveSelection && backupClipboard != null)
-            {
-                string toRestore = backupClipboard;
-                hasActiveSelection = false;
-                backupClipboard = null;
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        await TextService.SetClipboardTextAsync(toRestore);
-                    }
-                    catch (Exception ex)
-                    {
-                        CrashLogger.Log(ex, "SelectionManager.OnMenuDismissed restore clipboard");
-                    }
-                });
-            }
-            else
-            {
-                hasActiveSelection = false;
-                backupClipboard = null;
-            }
+            selectedText = null;
         }
 
         private static int CountLetters(string text)
