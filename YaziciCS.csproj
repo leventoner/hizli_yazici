@@ -9,6 +9,8 @@
     <AssemblyName>HizliYazici</AssemblyName>
     <RootNamespace>YaziciCS</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredCompilation>true</TieredCompilation>
   </PropertyGroup>
 
   <ItemGroup>

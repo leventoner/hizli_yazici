@@ -37,7 +37,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
         position: 'fixed',
         top: `${position.top}px`,
         left: `${position.left}px`,
-        transform: 'translate(-50%, -100%) translateY(-10px)',
+        transform: 'translate(-50%, -100%) translateY(-28px)',
         zIndex: 40,
       }
     : {};

@@ -3,86 +3,17 @@ using System.Collections.Generic;
 
 namespace YaziciCS.Services
 {
+    /// <summary>
+    /// Yüksek performanslı ve sıfır gereksiz heap tahsisli (allocation-free) Deasciifier motoru.
+    /// Türkçe karakter dönüşümlerini in-place char[] üzerinde işletir; string.Concat ve 
+    /// tek harflik Dictionary tahsislerini ortadan kaldırır.
+    /// </summary>
     public class Deasciifier
     {
         private const int ContextSize = 10;
 
-        private string asciiString;
-        private string convertedString;
-
-        private static readonly Dictionary<string, string> TurkishAsciifyTable = new Dictionary<string, string>
-        {
-            {"ç", "c"}, {"Ç", "C"},
-            {"ğ", "g"}, {"Ğ", "G"},
-            {"ö", "o"}, {"Ö", "O"},
-            {"ü", "u"}, {"Ü", "U"},
-            {"ı", "i"}, {"İ", "I"},
-            {"ş", "s"}, {"Ş", "S"}
-        };
-
-        private static readonly Dictionary<string, string> TurkishToggleAccentTable = new Dictionary<string, string>
-        {
-            {"c", "ç"}, {"C", "Ç"},
-            {"g", "ğ"}, {"G", "Ğ"},
-            {"o", "ö"}, {"O", "Ö"},
-            {"u", "ü"}, {"U", "Ü"},
-            {"i", "ı"}, {"I", "İ"},
-            {"s", "ş"}, {"S", "Ş"},
-            {"ç", "c"}, {"Ç", "C"},
-            {"ğ", "g"}, {"Ğ", "G"},
-            {"ö", "o"}, {"Ö", "O"},
-            {"ü", "u"}, {"Ü", "U"},
-            {"ı", "i"}, {"İ", "I"},
-            {"ş", "s"}, {"Ş", "S"}
-        };
-
-        private static readonly Dictionary<string, string> TurkishDowncaseAsciifyTable;
-        private static readonly Dictionary<string, string> TurkishUpcaseAccentsTable;
-
-        static Deasciifier()
-        {
-            TurkishDowncaseAsciifyTable = new Dictionary<string, string>();
-            for (char ch = 'A'; ch <= 'Z'; ch++)
-            {
-                string upper = ch.ToString();
-                string lower = char.ToLowerInvariant(ch).ToString();
-                TurkishDowncaseAsciifyTable[upper] = lower;
-                TurkishDowncaseAsciifyTable[lower] = lower;
-            }
-            TurkishDowncaseAsciifyTable["ç"] = "c";
-            TurkishDowncaseAsciifyTable["Ç"] = "c";
-            TurkishDowncaseAsciifyTable["ğ"] = "g";
-            TurkishDowncaseAsciifyTable["Ğ"] = "g";
-            TurkishDowncaseAsciifyTable["ö"] = "o";
-            TurkishDowncaseAsciifyTable["Ö"] = "o";
-            TurkishDowncaseAsciifyTable["ü"] = "u";
-            TurkishDowncaseAsciifyTable["Ü"] = "u";
-            TurkishDowncaseAsciifyTable["ı"] = "i";
-            TurkishDowncaseAsciifyTable["İ"] = "i";
-            TurkishDowncaseAsciifyTable["ş"] = "s";
-            TurkishDowncaseAsciifyTable["Ş"] = "s";
-
-            TurkishUpcaseAccentsTable = new Dictionary<string, string>();
-            for (char ch = 'A'; ch <= 'Z'; ch++)
-            {
-                string upper = ch.ToString();
-                string lower = char.ToLowerInvariant(ch).ToString();
-                TurkishUpcaseAccentsTable[upper] = lower;
-                TurkishUpcaseAccentsTable[lower] = lower;
-            }
-            TurkishUpcaseAccentsTable["ç"] = "C";
-            TurkishUpcaseAccentsTable["Ç"] = "C";
-            TurkishUpcaseAccentsTable["ğ"] = "G";
-            TurkishUpcaseAccentsTable["Ğ"] = "G";
-            TurkishUpcaseAccentsTable["ö"] = "O";
-            TurkishUpcaseAccentsTable["Ö"] = "O";
-            TurkishUpcaseAccentsTable["ü"] = "U";
-            TurkishUpcaseAccentsTable["Ü"] = "U";
-            TurkishUpcaseAccentsTable["ı"] = "I";
-            TurkishUpcaseAccentsTable["İ"] = "I";
-            TurkishUpcaseAccentsTable["ş"] = "S";
-            TurkishUpcaseAccentsTable["Ş"] = "S";
-        }
+        private readonly string asciiString;
+        private readonly char[] buffer;
 
         public static string Deasciify(string text)
         {
@@ -94,44 +25,88 @@ namespace YaziciCS.Services
         public Deasciifier(string input)
         {
             this.asciiString = input;
-            this.convertedString = input;
+            this.buffer = input.ToCharArray();
         }
 
         public string ConvertToTurkish()
         {
-            for (int index = 0; index < convertedString.Length; index++)
+            for (int index = 0; index < buffer.Length; index++)
             {
-                string ch = convertedString[index].ToString();
+                char ch = buffer[index];
                 if (TurkishNeedCorrection(ch, index))
                 {
-                    convertedString = SetCharAt(convertedString, index, TurkishToggleAccent(ch));
+                    buffer[index] = TurkishToggleAccent(ch);
                 }
             }
-            return convertedString;
+            return new string(buffer);
         }
 
-        private static string SetCharAt(string str, int pos, string c)
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static char TurkishToggleAccent(char c) => c switch
         {
-            return string.Concat(str.AsSpan(0, pos), c.AsSpan(), str.AsSpan(pos + 1));
-        }
+            'c' => 'ç', 'C' => 'Ç',
+            'g' => 'ğ', 'G' => 'Ğ',
+            'o' => 'ö', 'O' => 'Ö',
+            'u' => 'ü', 'U' => 'Ü',
+            'i' => 'ı', 'I' => 'İ',
+            's' => 'ş', 'S' => 'Ş',
+            'ç' => 'c', 'Ç' => 'C',
+            'ğ' => 'g', 'Ğ' => 'G',
+            'ö' => 'o', 'Ö' => 'O',
+            'ü' => 'u', 'Ü' => 'U',
+            'ı' => 'i', 'İ' => 'I',
+            'ş' => 's', 'Ş' => 'S',
+            _ => c
+        };
 
-        private static string TurkishToggleAccent(string c)
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static char TurkishAsciify(char c) => c switch
         {
-            return TurkishToggleAccentTable.TryGetValue(c, out string result) ? result : c;
-        }
+            'ç' => 'c', 'Ç' => 'C',
+            'ğ' => 'g', 'Ğ' => 'G',
+            'ö' => 'o', 'Ö' => 'O',
+            'ü' => 'u', 'Ü' => 'U',
+            'ı' => 'i', 'İ' => 'I',
+            'ş' => 's', 'Ş' => 'S',
+            _ => c
+        };
 
-        private bool TurkishNeedCorrection(string ch, int point)
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static char TurkishDowncaseAsciify(char c) => c switch
         {
-            string tr = TurkishAsciifyTable.TryGetValue(ch, out string ascii) ? ascii : ch;
-            string trLower = tr.ToLowerInvariant();
+            'ç' or 'Ç' or 'c' or 'C' => 'c',
+            'ğ' or 'Ğ' or 'g' or 'G' => 'g',
+            'ö' or 'Ö' or 'o' or 'O' => 'o',
+            'ü' or 'Ü' or 'u' or 'U' => 'u',
+            'ı' or 'İ' or 'i' or 'I' => 'i',
+            'ş' or 'Ş' or 's' or 'S' => 's',
+            _ => char.ToLowerInvariant(c)
+        };
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static char TurkishUpcaseAccents(char c) => c switch
+        {
+            'ç' or 'Ç' => 'C',
+            'ğ' or 'Ğ' => 'G',
+            'ö' or 'Ö' => 'O',
+            'ü' or 'Ü' => 'U',
+            'ı' or 'İ' => 'I',
+            'ş' or 'Ş' => 'S',
+            _ => char.ToLowerInvariant(c)
+        };
+
+        private bool TurkishNeedCorrection(char ch, int point)
+        {
+            char tr = TurkishAsciify(ch);
+            string trLowerKey = char.ToLowerInvariant(tr).ToString();
 
             bool m = false;
-            if (TurkishPatternTable.Table.TryGetValue(trLower, out var pl))
+            if (TurkishPatternTable.Table.TryGetValue(trLowerKey, out var pl))
             {
                 m = TurkishMatchPattern(pl, point);
             }
 
-            if (tr == "I")
+            if (tr == 'I')
             {
                 return ch == tr ? !m : m;
             }
@@ -182,10 +157,13 @@ namespace YaziciCS.Services
 
             while (i < s.Length && !space && index < asciiString.Length)
             {
-                string currentChar = convertedString[index].ToString();
-                if (TurkishDowncaseAsciifyTable.TryGetValue(currentChar, out string x))
+                char currentChar = buffer[index];
+                if ((currentChar >= 'a' && currentChar <= 'z') || (currentChar >= 'A' && currentChar <= 'Z') ||
+                    currentChar == 'ç' || currentChar == 'Ç' || currentChar == 'ğ' || currentChar == 'Ğ' ||
+                    currentChar == 'ö' || currentChar == 'Ö' || currentChar == 'ü' || currentChar == 'Ü' ||
+                    currentChar == 'ı' || currentChar == 'İ' || currentChar == 'ş' || currentChar == 'Ş')
                 {
-                    s[i] = x[0];
+                    s[i] = TurkishDowncaseAsciify(currentChar);
                     i++;
                     space = false;
                 }
@@ -208,10 +186,13 @@ namespace YaziciCS.Services
 
             while (i >= 0 && index >= 0)
             {
-                string currentChar = convertedString[index].ToString();
-                if (TurkishUpcaseAccentsTable.TryGetValue(currentChar, out string x))
+                char currentChar = buffer[index];
+                if ((currentChar >= 'a' && currentChar <= 'z') || (currentChar >= 'A' && currentChar <= 'Z') ||
+                    currentChar == 'ç' || currentChar == 'Ç' || currentChar == 'ğ' || currentChar == 'Ğ' ||
+                    currentChar == 'ö' || currentChar == 'Ö' || currentChar == 'ü' || currentChar == 'Ü' ||
+                    currentChar == 'ı' || currentChar == 'İ' || currentChar == 'ş' || currentChar == 'Ş')
                 {
-                    s[i] = x[0];
+                    s[i] = TurkishUpcaseAccents(currentChar);
                     i--;
                     space = false;
                 }

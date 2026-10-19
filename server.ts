@@ -52,9 +52,9 @@ if (fs.existsSync(SETTINGS_FILE)) {
   }
 }
 
-function saveSettingsToFile() {
+async function saveSettingsToFile() {
   try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+    await fs.promises.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
   } catch (err) {
     console.warn('Could not save settings.json:', err);
   }
@@ -89,10 +89,10 @@ app.get('/api/settings', (req, res) => {
   });
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', async (req, res) => {
   const updates = req.body || {};
   settings = { ...settings, ...updates };
-  saveSettingsToFile();
+  await saveSettingsToFile();
   res.json({ success: true, settings });
 });
 
@@ -115,133 +115,44 @@ app.post('/api/deasciify', (req, res) => {
   }
 });
 
-// Metin İyileştirme (AI veya Ücretsiz Yerel Kural Motoru)
-app.post('/api/improve', async (req, res) => {
+// Metin İyileştirme (Tamamen Yerel ve Ücretsiz Kural Motoru - LLM Bağımlılığı Kaldırıldı)
+app.post('/api/improve', (req, res) => {
   try {
-    const { text, provider = settings.improve_provider || 'auto' } = req.body;
+    const { text } = req.body;
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Metin parametresi zorunludur.' });
     }
 
-    // 1. Ücretsiz mod seçildiyse doğrudan yerel motoru çalıştır (API anahtarsız)
-    if (provider === 'free') {
-      const improved = improveTurkishTextFree(text);
-      return res.json({
-        original: text,
-        improved,
-        changed: text.trim() !== improved.trim(),
-        provider: 'free',
-        message: 'Ücretsiz yerel kural motoruyla iyileştirildi.',
-      });
-    }
-
-    // 2. Gemini veya Otomatik mod
-    const prompt =
-      'You are a professional text editor. Analyze the language of the following text. ' +
-      'Improve its grammar, spelling, punctuation, word order, and general flow while STRICTLY preserving its original language and meaning. ' +
-      'Do NOT translate it. Return ONLY the improved text without explanations, notes, intros, or markdown quotes.\n\n' +
-      `Text:\n"""\n${text}\n"""`;
-
-    // Prioritized model chain: start with rock-solid gemini-2.5-flash, fallback to 2.0-flash, 3.8-flash, 3.6-flash
-    const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'models/gemini-3.8-flash',
-      'models/gemini-3.6-flash',
-      'gemini-1.5-flash',
-    ];
-
-    let improvedText = '';
-    let usedModel = '';
-    let lastError: any = null;
-
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const ai = getGeminiClient();
-
-        for (const modelName of candidateModels) {
-          try {
-            // 6-second timeout per attempt
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`Model ${modelName} zaman aşımı (6s)`)), 6000)
-            );
-
-            const generatePromise = ai.models.generateContent({
-              model: modelName,
-              contents: prompt,
-            });
-
-            const response: any = await Promise.race([generatePromise, timeoutPromise]);
-            const resultText = response.text?.trim();
-
-            if (resultText && resultText.length > 0) {
-              improvedText = resultText;
-              usedModel = modelName;
-              break;
-            }
-          } catch (modelErr: any) {
-            console.warn(`Model ${modelName} başarısız:`, modelErr.status || modelErr.message);
-            lastError = modelErr;
-          }
-        }
-      } catch (clientErr: any) {
-        lastError = clientErr;
-      }
-    } else {
-      lastError = new Error('GEMINI_API_KEY tanımlanmamış.');
-    }
-
-    // If Gemini succeeded
-    if (improvedText) {
-      // Strip markdown quote artifacts if returned
-      if (improvedText.startsWith('"""') && improvedText.endsWith('"""')) {
-        improvedText = improvedText.slice(3, -3).trim();
-      } else if (improvedText.startsWith('"') && improvedText.endsWith('"')) {
-        improvedText = improvedText.slice(1, -1).trim();
-      }
-
-      return res.json({
-        original: text,
-        improved: improvedText,
-        changed: text.trim() !== improvedText.trim(),
-        provider: 'gemini',
-        model: usedModel,
-      });
-    }
-
-    // 3. Fallback: If provider was 'auto', seamlessly fall back to free local engine
-    if (provider === 'auto' || !process.env.GEMINI_API_KEY) {
-      console.log('Gemini yanıt vermedi veya aşırı yoğun; ücretsiz yerel motor devreye giriyor...');
-      const fallbackImproved = improveTurkishTextFree(text);
-      return res.json({
-        original: text,
-        improved: fallbackImproved,
-        changed: text.trim() !== fallbackImproved.trim(),
-        provider: 'free-fallback',
-        message: 'Gemini modeli aşırı yoğun (503) olduğu için ücretsiz kural motoru devreye girdi.',
-      });
-    }
-
-    // If provider was explicitly 'gemini' and failed
-    throw new Error(
-      lastError?.message ||
-        'Gemini modelleri şu anda yoğun (503). Ayarlardan "Ücretsiz" veya "Otomatik" seçeneğini seçebilirsiniz.'
-    );
+    const improved = improveTurkishTextFree(text);
+    return res.json({
+      original: text,
+      improved,
+      changed: text.trim() !== improved.trim(),
+      provider: 'local-free',
+      message: 'Tamamen yerel kural motoruyla anında iyileştirildi.',
+    });
   } catch (err: any) {
-    console.error('Improve error:', err);
-    // Even on error, fallback to free local engine so the user is never stranded!
-    try {
-      const freeFallback = improveTurkishTextFree(req.body.text || '');
-      return res.json({
-        original: req.body.text,
-        improved: freeFallback,
-        changed: req.body.text?.trim() !== freeFallback.trim(),
-        provider: 'free-fallback',
-        message: 'Gemini yanıt vermedi; ücretsiz metin düzeltici ile tamamlandı.',
-      });
-    } catch {
-      res.status(500).json({ error: err.message || 'Metin iyileştirme sırasında hata oluştu.' });
+    res.status(500).json({ error: err.message || 'Metin iyileştirme sırasında hata oluştu.' });
+  }
+});
+
+// Metin İyileştirme - SSE Akış Uç Noktası (Yerel motor tek seferde anında döndürür)
+app.post('/api/improve/stream', (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Metin parametresi zorunludur.' });
     }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const improved = improveTurkishTextFree(text);
+    res.write(`data: ${JSON.stringify({ chunk: improved, done: true, provider: 'local-free' })}\n\n`);
+    res.end();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Stream hatası oluştu.' });
   }
 });
 

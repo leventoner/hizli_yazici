@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace YaziciCS.Managers
 {
@@ -49,6 +50,11 @@ namespace YaziciCS.Managers
             public IntPtr dwExtraInfo;
         }
 
+        /// <summary>
+        /// Kanca geri çağrımı işletim sistemini bloklamaması için 0 ms içinde dönmeli.
+        /// İşlemler ThreadPool üzerinden asenkron tetiklenerek farenin donması veya
+        /// Windows'un kancayı zaman aşımı (LowLevelHooksTimeout) nedeniyle düşürmesi önlenir.
+        /// </summary>
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             if (nCode >= 0)
@@ -56,12 +62,16 @@ namespace YaziciCS.Managers
                 if (wParam == (IntPtr)WM_LBUTTONDOWN)
                 {
                     var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                    LeftButtonDown?.Invoke(hookStruct.pt.x, hookStruct.pt.y);
+                    int x = hookStruct.pt.x;
+                    int y = hookStruct.pt.y;
+                    ThreadPool.QueueUserWorkItem(_ => LeftButtonDown?.Invoke(x, y));
                 }
                 else if (wParam == (IntPtr)WM_LBUTTONUP)
                 {
                     var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                    LeftButtonUp?.Invoke(hookStruct.pt.x, hookStruct.pt.y);
+                    int x = hookStruct.pt.x;
+                    int y = hookStruct.pt.y;
+                    ThreadPool.QueueUserWorkItem(_ => LeftButtonUp?.Invoke(x, y));
                 }
             }
             return CallNextHookEx(hookId, nCode, wParam, lParam);

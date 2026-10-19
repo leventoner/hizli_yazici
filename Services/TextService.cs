@@ -39,10 +39,11 @@ namespace YaziciCS.Services
         private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
 
         private const uint CF_UNICODETEXT = 13;
+        private static readonly int[] ClipboardBackoffMs = { 2, 5, 10, 15, 25, 35, 50, 50, 50, 50 };
 
         public static async Task<string> GetClipboardTextAsync()
         {
-            for (int i = 0; i < 15; i++)
+            for (int i = 0; i < ClipboardBackoffMs.Length; i++)
             {
                 if (OpenClipboard(IntPtr.Zero))
                 {
@@ -54,7 +55,7 @@ namespace YaziciCS.Services
                             IntPtr lpstr = GlobalLock(hGlobal);
                             if (lpstr != IntPtr.Zero)
                             {
-                                string text = System.Runtime.InteropServices.Marshal.PtrToStringUni(lpstr);
+                                string? text = System.Runtime.InteropServices.Marshal.PtrToStringUni(lpstr);
                                 GlobalUnlock(hGlobal);
                                 return text ?? "";
                             }
@@ -62,16 +63,37 @@ namespace YaziciCS.Services
                     }
                     finally { CloseClipboard(); }
                 }
-                await Task.Delay(50);
+                await Task.Delay(ClipboardBackoffMs[i]);
             }
             return "";
         }
 
+        public static async Task ClearClipboardAsync()
+        {
+            for (int i = 0; i < ClipboardBackoffMs.Length; i++)
+            {
+                if (OpenClipboard(IntPtr.Zero))
+                {
+                    try
+                    {
+                        EmptyClipboard();
+                        return;
+                    }
+                    finally { CloseClipboard(); }
+                }
+                await Task.Delay(ClipboardBackoffMs[i]);
+            }
+        }
+
         public static async Task SetClipboardTextAsync(string text)
         {
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text))
+            {
+                await ClearClipboardAsync();
+                return;
+            }
 
-            for (int i = 0; i < 15; i++)
+            for (int i = 0; i < ClipboardBackoffMs.Length; i++)
             {
                 if (OpenClipboard(IntPtr.Zero))
                 {
@@ -84,7 +106,7 @@ namespace YaziciCS.Services
                     }
                     finally { CloseClipboard(); }
                 }
-                await Task.Delay(50);
+                await Task.Delay(ClipboardBackoffMs[i]);
             }
         }
 
@@ -121,60 +143,6 @@ namespace YaziciCS.Services
             };
         }
 
-        /// <summary>
-        /// Gemini'den serbest metin yerine ham yanıt (ör. sözlük için JSON) döndürür.
-        /// Tüm model zincirini dener; hiçbiri başarılı olmazsa boş string döner.
-        /// </summary>
-        internal static Task<(string Text, string? UsedModel)> CallGeminiRawAsync(string prompt, string operation, int timeoutSeconds = 10)
-            => CallGeminiRawInternalAsync(prompt, operation, timeoutSeconds);
-
-        /// <summary>
-        /// Gemini'den ham yanıt döndürür; yanında kullanılan modelin adını da verir
-        /// (başarısız olursa UsedModel null kalır).
-        /// </summary>
-        private static async Task<(string Text, string? UsedModel)> CallGeminiRawInternalAsync(string prompt, string operation, int timeoutSeconds)
-        {
-            string? usedModel = null;
-            if (string.IsNullOrWhiteSpace(prompt)) return ("", null);
-
-            string apiKey = SettingsManager.Current.GeminiApiKey;
-            if (string.IsNullOrEmpty(apiKey)) return ("", null);
-
-            var prioritized = GetPrioritizedModels();
-            foreach (var modelResourceName in prioritized)
-            {
-                var attemptTimer = System.Diagnostics.Stopwatch.StartNew();
-                string modelUrl = modelResourceName.StartsWith("models/") ? modelResourceName : $"models/{modelResourceName}";
-                string uri = $"https://generativelanguage.googleapis.com/v1beta/{modelUrl}:generateContent?key={apiKey}";
-                var requestBody = new { contents = new[] { new { parts = new[] { new { text = prompt } } } } };
-
-                try
-                {
-                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-                    var response = await HttpClient.PostAsync(uri, new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json"), cts.Token);
-                    string responseString = await response.Content.ReadAsStringAsync();
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        using JsonDocument doc = JsonDocument.Parse(responseString);
-                        string? text = doc.RootElement.GetProperty("candidates")[0]
-                            .GetProperty("content").GetProperty("parts")[0]
-                            .GetProperty("text").GetString();
-                        LogModelAttempt(operation, modelResourceName, "success", attemptTimer.ElapsedMilliseconds);
-                        return (text?.Trim() ?? "", modelResourceName);
-                    }
-
-                    LogModelAttempt(operation, modelResourceName, $"http-{(int)response.StatusCode}", attemptTimer.ElapsedMilliseconds);
-                }
-                catch
-                {
-                    LogModelAttempt(operation, modelResourceName, "exception", attemptTimer.ElapsedMilliseconds);
-                }
-            }
-
-            return ("", null);
-        }
-
         internal static TimeSpan GetModelRetryDelay(int retryCount)
         {
             return TimeSpan.FromSeconds(Math.Min(10, Math.Pow(2, Math.Min(retryCount, 3))));
@@ -185,7 +153,21 @@ namespace YaziciCS.Services
             if (string.IsNullOrWhiteSpace(prompt)) return originalText;
 
             string apiKey = SettingsManager.Current.GeminiApiKey;
-            if (string.IsNullOrEmpty(apiKey)) return "Hata: GEMINI_API_KEY bulunamadı.";
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                // API anahtarı yoksa kullanıcıyı yarı yolda bırakma: doğrudan yerel ücretsiz motoru çalıştır
+                try
+                {
+                    string freeRes = FreeTextImprover.Improve(originalText);
+                    if (originalText.Trim() != freeRes.Trim())
+                    {
+                        return freeRes;
+                    }
+                }
+                catch { }
+
+                return "Bilgi: GEMINI_API_KEY bulunamadı. Gelişmiş yapay zeka iyileştirmesi için .env dosyasına anahtarınızı ekleyebilirsiniz.";
+            }
 
             var prioritized = GetPrioritizedModels();
             string lastError = "";
@@ -239,30 +221,15 @@ namespace YaziciCS.Services
             return $"Hiçbir model yanıt vermedi.\n\nSon Hata:\n{lastError}";
         }
 
-        public static async Task<string> ImproveTextAsync(string text)
+        public static Task<string> ImproveTextAsync(string text)
         {
-            if (string.IsNullOrWhiteSpace(text)) return text;
-
-            string prompt = "You are a professional text editor. Analyze the language of the following text. " +
-                "Improve its grammar, spelling, punctuation, word order, and general flow while STRICTLY preserving its original language and meaning. " +
-                "Do NOT translate it. Return ONLY the improved text without explanations, notes, intros, or markdown quotes.\n\n" +
-                $"Text:\n\"\"\"\n{text}\n\"\"\"";
-
-            return await CallGeminiAsync(prompt, text);
+            if (string.IsNullOrWhiteSpace(text)) return Task.FromResult(text);
+            return Task.FromResult(FreeTextImprover.Improve(text));
         }
 
         public static async Task<string> TranslateTextAsync(string text, string targetLanguage = "en")
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-
-            // Tek kelime seçildiyse → otomatik sözlük modu (web sürümüyle aynı davranış).
-            // Cümleler normal çeviriye gider; tek kelimeler kök analizi + anlam içerir.
-            string? singleWord = DictionaryService.ExtractSingleWord(text);
-            if (singleWord != null)
-            {
-                DictionaryEntry entry = await DictionaryService.LookupAsync(singleWord, targetLanguage);
-                return DictionaryService.FormatEntry(entry);
-            }
 
             bool isFrench = targetLanguage.Equals("fr", StringComparison.OrdinalIgnoreCase);
             bool isDutch = targetLanguage.Equals("nl", StringComparison.OrdinalIgnoreCase);

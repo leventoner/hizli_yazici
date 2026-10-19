@@ -87,20 +87,11 @@
 
             <!-- Content Body: Selectable and Copyable Result Text -->
             <ScrollViewer Grid.Row="1" MaxHeight="400" VerticalScrollBarVisibility="Auto" Margin="16,14,16,10">
-                <Grid>
-                    <!-- Plain translation output (single block of text) -->
-                    <TextBox x:Name="TxtResult" IsReadOnly="True" TextWrapping="Wrap" 
-                             Background="Transparent" Foreground="#F8FAFC" BorderThickness="0"
-                             FontSize="14.5" FontFamily="Segoe UI" Padding="2"
-                             SelectionBrush="#3B82F6" Cursor="IBeam" Focusable="True"
-                             Text="Çevrilen metin buraya gelecek..."/>
-                    <!-- Dictionary output (rich, colored structure) -->
-                    <RichTextBox x:Name="RtResult" IsReadOnly="True" Background="Transparent" BorderThickness="0"
-                                 SelectionBrush="#3B82F6" Cursor="IBeam" Focusable="True"
-                                 Padding="0" Margin="0"
-                                 FontFamily="Segoe UI" FontSize="14.5" Foreground="#E2E8F0"
-                                 Visibility="Collapsed"/>
-                </Grid>
+                <TextBox x:Name="TxtResult" IsReadOnly="True" TextWrapping="Wrap" 
+                         Background="Transparent" Foreground="#F8FAFC" BorderThickness="0"
+                         FontSize="14.5" FontFamily="Segoe UI" Padding="2"
+                         SelectionBrush="#3B82F6" Cursor="IBeam" Focusable="True"
+                         Text="Çevrilen metin buraya gelecek..."/>
             </ScrollViewer>
 
             <!-- Footer -->

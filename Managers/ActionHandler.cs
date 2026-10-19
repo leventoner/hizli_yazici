@@ -20,11 +20,14 @@ namespace YaziciCS.Managers
 
         private static async Task SimulateCtrlC()
         {
+            // Wait for menu to hide and focus to return to the original window
+            await Task.Delay(250);
+            
             keybd_event(VK_CONTROL, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             keybd_event(VK_C, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             keybd_event(VK_C, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
             keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
-            await Task.Delay(400);
+            await Task.Delay(500);
         }
 
         public static async Task HandleFixClipboardAsync(bool triggerCopy = false)
@@ -64,18 +67,17 @@ namespace YaziciCS.Managers
                 return;
             }
 
-            ShowNotification?.Invoke("İşleniyor...", "Metin sihirbaz ile iyileştiriliyor...", "#9b59b6");
+            // Tamamen yerel, ücretsiz ve anlık kural motoruyla iyileştir
+            string improved = FreeTextImprover.Improve(text);
 
-            string improved = await TextService.ImproveTextAsync(text);
-
-            if (!string.IsNullOrEmpty(improved) && !improved.StartsWith("Hata:") && !improved.StartsWith("Hiçbir model"))
+            if (text.Trim() != improved.Trim())
             {
                 await TextService.SetClipboardTextAsync(improved);
                 ShowNotification?.Invoke("Metin İyileştirildi!", improved, "#9b59b6");
             }
-            else
+            else if (SettingsManager.Current.NotifyOnNoChange)
             {
-                ShowNotification?.Invoke("İşlem Başarısız", improved, "#e74c3c");
+                ShowNotification?.Invoke("Düzeltme Gerekmedi", "Metin zaten düzgün görünüyor.", "#3498db");
             }
         }
 

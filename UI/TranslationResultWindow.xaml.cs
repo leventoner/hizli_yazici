@@ -4,15 +4,14 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using YaziciCS.Services;
 
 namespace YaziciCS.UI
 {
     public partial class TranslationResultWindow : Window
     {
-        private string originalText;
-        private string translatedText;
-        private string langPair;
+        private readonly string originalText;
+        private readonly string translatedText;
+        private readonly string langPair;
 
         public TranslationResultWindow(string originalText, string translatedText, string langPair)
         {
@@ -28,49 +27,57 @@ namespace YaziciCS.UI
         /// </summary>
         public void UpdateContent(string originalText, string translatedText, string langPair)
         {
-            this.originalText = originalText ?? "";
-            this.translatedText = translatedText ?? "";
-            this.langPair = langPair ?? "Çeviri";
-            RenderContent();
-        }
+            TxtResult.Text = translatedText ?? "";
+            TxtLang.Text = langPair ?? "Çeviri";
 
-        /// <summary>
-        /// Renders the result into either the rich dictionary view (single word) or
-        /// the plain translation TextBox, and updates header / badge / stats.
-        /// </summary>
-        private void RenderContent()
-        {
-            bool isDictionaryMode = !string.IsNullOrWhiteSpace(originalText) && !originalText.Trim().Contains(" ");
-
-            if (isDictionaryMode)
+            // Single word -> dictionary mode (automatic, no button needed)
+            if (!string.IsNullOrWhiteSpace(originalText) && !originalText.Trim().Contains(" "))
             {
                 TxtTitle.Text = "📖 Sözlük & Anlam Analizi";
-
-                // Reuse the entry already produced by TranslateTextAsync (no second API call).
-                DictionaryEntry? entry = Services.DictionaryService.LastEntry;
-                if (entry != null)
-                {
-                    RtResult.Document = Services.DictionaryService.BuildFlowDocument(entry);
-                    RtResult.Visibility = Visibility.Visible;
-                    TxtResult.Visibility = Visibility.Collapsed;
-                }
-                else
-                {
-                    // Fallback: no cached entry — show plain text.
-                    TxtResult.Text = translatedText;
-                    TxtResult.Visibility = Visibility.Visible;
-                    RtResult.Visibility = Visibility.Collapsed;
-                }
             }
             else
             {
                 TxtTitle.Text = "Çeviri Sonucu";
-                TxtResult.Text = translatedText;
-                TxtResult.Visibility = Visibility.Visible;
-                RtResult.Visibility = Visibility.Collapsed;
             }
 
+            // Set badge color based on language
+            string lp = langPair ?? "";
+            if (lp.Contains("NL") || lp.Contains("Flamanca") || lp.Contains("Hollandaca"))
+            {
+                LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EA580C")); // Dutch Orange
+            }
+            else if (lp.Contains("FR") || lp.Contains("Fransızca"))
+            {
+                LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")); // French Red
+            }
+            else
+            {
+                LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB")); // English Blue
+            }
+
+            int charCount = (translatedText ?? "").Length;
+            int wordCount = Regex.Split((translatedText ?? "").Trim(), @"\s+").Length;
+            if (string.IsNullOrWhiteSpace(translatedText)) wordCount = 0;
+
+            TxtStats.Text = $"{charCount} karakter • {wordCount} kelime";
+
+            TxtResult.Focus();
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            TxtResult.Text = translatedText;
             TxtLang.Text = langPair;
+
+            // Check if single word for dictionary mode
+            if (!string.IsNullOrWhiteSpace(originalText) && !originalText.Trim().Contains(" "))
+            {
+                TxtTitle.Text = "📖 Sözlük & Anlam Analizi";
+            }
+            else
+            {
+                TxtTitle.Text = "Çeviri Sonucu";
+            }
 
             // Set badge color based on language
             if (langPair.Contains("NL") || langPair.Contains("Flamanca") || langPair.Contains("Hollandaca"))
@@ -86,21 +93,13 @@ namespace YaziciCS.UI
                 LangBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB")); // English Blue
             }
 
-            int charCount = (translatedText ?? "").Length;
-            int wordCount = Regex.Split((translatedText ?? "").Trim(), @"\s+").Length;
+            int charCount = translatedText.Length;
+            int wordCount = Regex.Split(translatedText.Trim(), @"\s+").Length;
             if (string.IsNullOrWhiteSpace(translatedText)) wordCount = 0;
 
-            TxtStats.Text = isDictionaryMode
-                ? $"{charCount} karakter • sözlük girişi"
-                : $"{charCount} karakter • {wordCount} kelime";
+            TxtStats.Text = $"{charCount} karakter • {wordCount} kelime";
 
-            if (isDictionaryMode && RtResult.Visibility == Visibility.Visible) RtResult.Focus();
-            else TxtResult.Focus();
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            RenderContent();
+            TxtResult.Focus();
         }
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

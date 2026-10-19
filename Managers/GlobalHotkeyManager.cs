@@ -32,6 +32,7 @@ namespace YaziciCS.Managers
             // VK_C = 0x43
             else if (vkCode == 0x43 && isDown && isCtrlDown && !isShiftDown)
             {
+                SelectionManager.NotifyActionExecuted();
                 var now = DateTime.Now;
                 double diff = (now - lastCtrlCTime).TotalSeconds;
                 if (diff <= SettingsManager.Current.Cooldown && diff > 0.05)

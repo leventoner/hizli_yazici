@@ -1,8 +1,12 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Media;
+using YaziciCS.Services;
 using YaziciCS.UI;
 
 namespace YaziciCS.Managers
@@ -14,8 +18,35 @@ namespace YaziciCS.Managers
         private static GlobalMouseHook? mouseHook;
         private static FloatingMenu? menu;
 
-        [DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT
+        {
+            public uint type;
+            public MOUSEKEYBDHARDWAREINPUT mkhi;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct MOUSEKEYBDHARDWAREINPUT
+        {
+            [FieldOffset(0)]
+            public KEYBDINPUT ki;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KEYBDINPUT
+        {
+            public ushort wVk;
+            public ushort wScan;
+            public uint dwFlags;
+            public uint time;
+            public UIntPtr dwExtraInfo;
+        }
+
+        private const uint INPUT_KEYBOARD = 1;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
         [DllImport("user32.dll")]
         private static extern uint GetClipboardSequenceNumber();
@@ -29,10 +60,15 @@ namespace YaziciCS.Managers
         [DllImport("user32.dll")]
         private static extern short GetKeyState(int nVirtKey);
 
-        private const byte VK_CONTROL = 0x11;
-        private const byte VK_C = 0x43;
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        private const ushort VK_CONTROL = 0x11;
+        private const ushort VK_C = 0x43;
         private const int VK_SHIFT = 0x10;
-        private const uint KEYEVENTF_KEYUP = 0x0002;
 
         private const int SM_CXDOUBLECLK = 36;
         private const int SM_CYDOUBLECLK = 37;
@@ -44,6 +80,9 @@ namespace YaziciCS.Managers
         private static int lastUpTime;
         private static int clickCount;
         private static int currentRequestId;
+
+        private static string? backupClipboard;
+        private static bool hasActiveSelection;
 
         public static void Initialize(FloatingMenu floatingMenu)
         {
@@ -70,9 +109,9 @@ namespace YaziciCS.Managers
 
             int dragDistX = Math.Abs(x - downX);
             int dragDistY = Math.Abs(y - downY);
-            int minDragDist = GetSystemMetrics(SM_CXDRAG);
-            if (minDragDist <= 0) minDragDist = 4;
-            bool isDrag = (dragDistX > minDragDist || dragDistY > minDragDist);
+            int minDragDistX = Math.Max(GetSystemMetrics(SM_CXDRAG), 10);
+            int minDragDistY = Math.Max(GetSystemMetrics(SM_CYDRAG), 10);
+            bool isDrag = (dragDistX > minDragDistX || dragDistY > minDragDistY);
 
             uint doubleClickTime = GetDoubleClickTime();
             if (doubleClickTime == 0) doubleClickTime = 500;
@@ -106,13 +145,17 @@ namespace YaziciCS.Managers
 
             if (isDrag || isDoubleClick || isShift)
             {
-                TriggerSelectionCheck(x, y);
+                // Seçimin tüm dikey alanını belirle (çok satırlı seçimlerde en tepe ve en dip satırlar)
+                int topY = Math.Min(downY, y);
+                int bottomY = Math.Max(downY, y);
+                int centerX = isDrag ? ((downX + x) / 2) : x;
+
+                TriggerSelectionCheck(centerX, topY, bottomY);
             }
             else
             {
-                // Single stationary click without selection gesture.
-                // Hide floating menu if it's currently showing.
-                Application.Current.Dispatcher.Invoke(() =>
+                // Tek durağan tıklama: menü açıksa kapat
+                Application.Current?.Dispatcher?.BeginInvoke(() =>
                 {
                     if (menu != null && menu.IsVisible)
                     {
@@ -122,18 +165,32 @@ namespace YaziciCS.Managers
             }
         }
 
-        private static bool IsInsideMenu(int x, int y)
+        private static bool IsInsideMenu(int physX, int physY)
         {
             if (menu == null) return false;
             bool inside = false;
             try
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current?.Dispatcher?.Invoke(() =>
                 {
                     if (menu != null && menu.IsVisible)
                     {
-                        inside = x >= menu.Left && x <= menu.Left + menu.ActualWidth &&
-                                 y >= menu.Top && y <= menu.Top + menu.ActualHeight;
+                        if (menu.IsMouseOver)
+                        {
+                            inside = true;
+                            return;
+                        }
+
+                        // Windows DPI ölçeklemesini (125%, 150%) hesaba katarak fiziksel pikseli DIP'e çevir
+                        var dpi = VisualTreeHelper.GetDpi(menu);
+                        double scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+                        double scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+                        double dipX = physX / scaleX;
+                        double dipY = physY / scaleY;
+
+                        inside = dipX >= menu.Left && dipX <= menu.Left + menu.ActualWidth &&
+                                 dipY >= menu.Top && dipY <= menu.Top + menu.ActualHeight;
                     }
                 });
             }
@@ -141,72 +198,244 @@ namespace YaziciCS.Managers
             return inside;
         }
 
-        private static void TriggerSelectionCheck(int x, int y)
+        private static void TriggerSelectionCheck(int centerX, int topY, int bottomY)
         {
             int reqId = Interlocked.Increment(ref currentRequestId);
             Task.Run(async () =>
             {
-                await Task.Delay(150);
+                await Task.Delay(120);
                 if (reqId != currentRequestId) return;
 
-                await CheckSelectionAsync(x, y, reqId);
+                await CheckSelectionAsync(centerX, topY, bottomY, reqId);
             });
         }
 
-        private static async Task CheckSelectionAsync(int x, int y, int reqId)
+        private static async Task CheckSelectionAsync(int centerX, int topY, int bottomY, int reqId)
         {
             try
             {
-                uint oldSeq = GetClipboardSequenceNumber();
-                string oldClipboard = await Services.TextService.GetClipboardTextAsync();
+                // 1. Panoyu kirletmeden önce UI Automation ile seçili metni ve kesin ekran koordinatlarını oku
+                string? uiText = GetSelectedTextViaUIAutomation(out double? uiaCenterX, out double? uiaTopY, out double? uiaBottomY);
+                if (uiText != null)
+                {
+                    string trimmedUi = uiText.Trim();
+                    // En az 2 harfli kelimeleri ("ev", "su", "at", "to", "go") kabul et
+                    if (trimmedUi.Length < 2 || CountLetters(trimmedUi) < 2)
+                    {
+                        return;
+                    }
 
-                // Simulate Ctrl+C with our special signature so internal copy never triggers hotkeys
-                keybd_event(VK_CONTROL, 0, 0, (UIntPtr)APP_INPUT_SIGNATURE);
-                keybd_event(VK_C, 0, 0, (UIntPtr)APP_INPUT_SIGNATURE);
-                keybd_event(VK_C, 0, KEYEVENTF_KEYUP, (UIntPtr)APP_INPUT_SIGNATURE);
-                keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, (UIntPtr)APP_INPUT_SIGNATURE);
+                    string oldClip = await TextService.GetClipboardTextAsync();
+                    backupClipboard = oldClip;
+                    hasActiveSelection = true;
+                    await TextService.SetClipboardTextAsync(trimmedUi);
+
+                    double finalCenterX = uiaCenterX ?? centerX;
+                    double finalTopY = uiaTopY ?? topY;
+                    double finalBottomY = uiaBottomY ?? bottomY;
+
+                    Application.Current?.Dispatcher?.BeginInvoke(() =>
+                    {
+                        if (reqId == currentRequestId)
+                        {
+                            menu?.ShowAt(finalCenterX, finalTopY, finalBottomY);
+                        }
+                    });
+                    return;
+                }
+
+                // 2. UI Automation desteklenmeyen pencerelerde (Chromium vb.) Ctrl+C simülasyonu
+                if (IsConsoleWindowActive())
+                {
+                    return;
+                }
+
+                uint oldSeq = GetClipboardSequenceNumber();
+                string oldClipboard = await TextService.GetClipboardTextAsync();
+
+                // Modern ve atomik SendInput ile Ctrl+C simülasyonu
+                SimulateCtrlC();
 
                 await Task.Delay(100);
                 if (reqId != currentRequestId) return;
 
                 uint newSeq = GetClipboardSequenceNumber();
-                string newClipboard = await Services.TextService.GetClipboardTextAsync();
-
-                if (string.IsNullOrWhiteSpace(newClipboard))
-                {
-                    return;
-                }
+                string newClipboard = await TextService.GetClipboardTextAsync();
 
                 bool changed = (newSeq != oldSeq) || (newClipboard != oldClipboard);
-                if (!changed)
+                if (!changed || string.IsNullOrWhiteSpace(newClipboard))
                 {
                     return;
                 }
 
                 string trimmed = newClipboard.Trim();
+                int letterCount = CountLetters(trimmed);
 
-                // Requirement 2: Do not show menu if text has fewer than 3 letters.
-                // At least 3 letters are required for the menu to appear.
-                if (trimmed.Length < 3 || CountLetters(trimmed) < 3)
+                // En az 2 harf seçilmiş olmalı
+                if (trimmed.Length < 2 || letterCount < 2)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
+                    if (newSeq != oldSeq)
+                    {
+                        await TextService.SetClipboardTextAsync(oldClipboard);
+                    }
+                    Application.Current?.Dispatcher?.BeginInvoke(() =>
                     {
                         menu?.HideMenu();
                     });
                     return;
                 }
 
-                Application.Current.Dispatcher.Invoke(() =>
+                backupClipboard = oldClipboard;
+                hasActiveSelection = true;
+
+                Application.Current?.Dispatcher?.BeginInvoke(() =>
                 {
                     if (reqId == currentRequestId)
                     {
-                        menu?.ShowAt(x, y);
+                        menu?.ShowAt(centerX, topY, bottomY);
                     }
                 });
             }
             catch (Exception ex)
             {
                 CrashLogger.Log(ex, "SelectionManager.CheckSelectionAsync");
+            }
+        }
+
+        public static void SimulateCtrlC()
+        {
+            INPUT[] inputs = new INPUT[4];
+
+            // Ctrl DOWN
+            inputs[0].type = INPUT_KEYBOARD;
+            inputs[0].mkhi.ki = new KEYBDINPUT { wVk = VK_CONTROL, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+
+            // C DOWN
+            inputs[1].type = INPUT_KEYBOARD;
+            inputs[1].mkhi.ki = new KEYBDINPUT { wVk = VK_C, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+
+            // C UP
+            inputs[2].type = INPUT_KEYBOARD;
+            inputs[2].mkhi.ki = new KEYBDINPUT { wVk = VK_C, dwFlags = KEYEVENTF_KEYUP, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+
+            // Ctrl UP
+            inputs[3].type = INPUT_KEYBOARD;
+            inputs[3].mkhi.ki = new KEYBDINPUT { wVk = VK_CONTROL, dwFlags = KEYEVENTF_KEYUP, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+
+            SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        private static string? GetSelectedTextViaUIAutomation(out double? centerX, out double? topY, out double? bottomY)
+        {
+            centerX = null;
+            topY = null;
+            bottomY = null;
+
+            try
+            {
+                var focused = AutomationElement.FocusedElement;
+                if (focused == null) return null;
+
+                if (focused.TryGetCurrentPattern(TextPattern.Pattern, out object patternObj) &&
+                    patternObj is TextPattern textPattern)
+                {
+                    var selections = textPattern.GetSelection();
+                    if (selections == null || selections.Length == 0)
+                    {
+                        return "";
+                    }
+
+                    var sb = new StringBuilder();
+                    double minTop = double.MaxValue;
+                    double maxBottom = double.MinValue;
+                    double midX = 0;
+                    bool hasRect = false;
+
+                    foreach (var sel in selections)
+                    {
+                        sb.Append(sel.GetText(-1));
+
+                        var rects = sel.GetBoundingRectangles();
+                        if (rects != null && rects.Length > 0)
+                        {
+                            foreach (var r in rects)
+                            {
+                                if (r.Width > 0 && r.Height > 0)
+                                {
+                                    if (r.Top < minTop) minTop = r.Top;
+                                    if (r.Bottom > maxBottom) maxBottom = r.Bottom;
+                                    midX = r.Left + (r.Width / 2);
+                                    hasRect = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasRect)
+                    {
+                        centerX = midX;
+                        topY = minTop;
+                        bottomY = maxBottom;
+                    }
+
+                    return sb.ToString();
+                }
+            }
+            catch
+            {
+                // UI Automation odaklı öğe yanıt vermiyorsa sessizce null dön
+            }
+            return null;
+        }
+
+        private static bool IsConsoleWindowActive()
+        {
+            try
+            {
+                IntPtr hwnd = GetForegroundWindow();
+                if (hwnd == IntPtr.Zero) return false;
+
+                var sb = new StringBuilder(256);
+                GetClassName(hwnd, sb, sb.Capacity);
+                string className = sb.ToString();
+
+                return className == "ConsoleWindowClass" || className == "CASCADIA_HOSTING_WINDOW_CLASS";
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void NotifyActionExecuted()
+        {
+            hasActiveSelection = false;
+            backupClipboard = null;
+        }
+
+        public static void OnMenuDismissed()
+        {
+            if (hasActiveSelection && backupClipboard != null)
+            {
+                string toRestore = backupClipboard;
+                hasActiveSelection = false;
+                backupClipboard = null;
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await TextService.SetClipboardTextAsync(toRestore);
+                    }
+                    catch (Exception ex)
+                    {
+                        CrashLogger.Log(ex, "SelectionManager.OnMenuDismissed restore clipboard");
+                    }
+                });
+            }
+            else
+            {
+                hasActiveSelection = false;
+                backupClipboard = null;
             }
         }
 

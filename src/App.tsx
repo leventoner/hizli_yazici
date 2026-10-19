@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { AppSettings, ToastMessage, HistoryItem, TranslationModalState } from './types';
 import { Deasciifier } from './services/deasciifier';
+import { improveTurkishTextFree } from './services/freeTextImprover';
 import { FloatingMenu } from './components/FloatingMenu';
 import { SettingsModal } from './components/SettingsModal';
 import { NotificationToast } from './components/NotificationToast';
@@ -260,10 +261,10 @@ export const App: React.FC = () => {
     setSelectionMenuPos(null);
   };
 
-  // 2. Metni İyileştir (Gemini AI text improver)
-  const handleImproveText = async () => {
+  // 2. Metni İyileştir (Tamamen Yerel Kural Motoru - Kotasız & Anında)
+  const handleImproveText = () => {
     if (!settings.enable_ai_improve) {
-      addToast('Özellik Kapalı', 'Yapay zeka metin iyileştirme özelliği ayarlardan kapatılmış.', '#e74c3c');
+      addToast('Özellik Kapalı', 'Metin iyileştirme özelliği ayarlardan kapatılmış.', '#e74c3c');
       return;
     }
 
@@ -276,35 +277,10 @@ export const App: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
-    setLoadingAction('improve');
-    addToast('İşleniyor...', 'Metin yapay zeka ile iyileştiriliyor...', '#9b59b6');
+    const improved = improveTurkishTextFree(targetText);
+    const changed = targetText.trim() !== improved.trim();
 
-    try {
-      const res = await fetch('/api/improve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: targetText,
-          provider: settings.improve_provider || 'auto',
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'İyileştirme başarısız oldu.');
-      }
-
-      const data = await res.json();
-      const improved = data.improved;
-      const isFallback = data.provider === 'free-fallback';
-      const isFree = data.provider === 'free';
-      const providerLabel = isFallback
-        ? 'Ücretsiz Motor (Yedek)'
-        : isFree
-        ? 'Ücretsiz Motor'
-        : `Gemini (${data.model || 'Flash'})`;
-
+    if (changed) {
       let newFullText = improved;
       if (selectedRange) {
         newFullText =
@@ -313,7 +289,7 @@ export const App: React.FC = () => {
           text.substring(selectedRange.end);
       }
       setText(newFullText);
-      setLastDiff({ original: targetText, modified: improved, title: `Metin İyileştirme (${providerLabel})` });
+      setLastDiff({ original: targetText, modified: improved, title: 'Metin İyileştirme (Yerel Kural Motoru)' });
       setHistory((prev) => [
         {
           id: Math.random().toString(),
@@ -321,8 +297,8 @@ export const App: React.FC = () => {
           action: 'improve',
           originalText: targetText,
           resultText: improved,
-          changed: targetText.trim() !== improved.trim(),
-          provider: providerLabel,
+          changed: true,
+          provider: 'Yerel Motor (Ücretsiz)',
         },
         ...prev.slice(0, 20),
       ]);
@@ -331,24 +307,16 @@ export const App: React.FC = () => {
         navigator.clipboard?.writeText(improved).catch(() => {});
       }
 
-      const toastTitle = isFallback
-        ? 'Metin Düzeltildi (Ücretsiz Motor Devreye Girdi)'
-        : isFree
-        ? 'Metin Düzeltildi (Ücretsiz Motor)'
-        : `Metin İyileştirildi! (${providerLabel})`;
-
       addToast(
-        toastTitle,
+        'Metin İyileştirildi!',
         settings.auto_copy_on_action ? `${improved} (Panoya Kopyalandı)` : improved,
-        isFallback || isFree ? '#10b981' : '#9b59b6'
+        '#9b59b6'
       );
-    } catch (err: any) {
-      addToast('İşlem Başarısız', err.message || 'Hata oluştu.', '#e74c3c');
-    } finally {
-      setIsLoading(false);
-      setLoadingAction(null);
-      setSelectionMenuPos(null);
+    } else if (settings.notify_on_no_change) {
+      addToast('Düzeltme Gerekmedi', 'Metin zaten düzgün görünüyor.', '#3498db');
     }
+
+    setSelectionMenuPos(null);
   };
 
   // 3. Çeviri (TR ↔ EN)
