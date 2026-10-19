@@ -49,3 +49,8 @@ $RECYCLE.BIN/
 *~
 .vscode/
 .idea/
+
+## Node
+node_modules/
+dist/
+build/

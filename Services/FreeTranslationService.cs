@@ -164,6 +164,20 @@ namespace YaziciCS.Services
             public string? DetectedSourceLanguage { get; init; }
         }
 
+        /// <summary>
+        /// Çeviri metnindeki control karakterleri ve nesne yer tutucularını temizler.
+        /// Bu karakterler UI'da "OBJ" kutucukları olarak görünür.
+        /// </summary>
+        private static readonly Regex ControlCharsRegex = new Regex(
+            "[\uFFFC\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2060-\u2064\uFEFF]",
+            RegexOptions.Compiled);
+
+        private static string SanitizeTranslatedText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            return ControlCharsRegex.Replace(text, "");
+        }
+
         private static async Task<GoogleTranslationResult?> TryGoogleKeylessAsync(string text, string target)
         {
             try
@@ -216,7 +230,7 @@ namespace YaziciCS.Services
 
                     return new GoogleTranslationResult
                     {
-                        TranslatedText = sb.ToString().Trim(),
+                        TranslatedText = SanitizeTranslatedText(sb.ToString().Trim()),
                         DetectedSourceLanguage = ReadDetectedSourceLanguage(root)
                     };
                 }
@@ -244,7 +258,7 @@ namespace YaziciCS.Services
 
                     return new GoogleTranslationResult
                     {
-                        TranslatedText = sb.ToString().Trim(),
+                        TranslatedText = SanitizeTranslatedText(sb.ToString().Trim()),
                         DetectedSourceLanguage = detectedSourceLanguage ?? ReadDetectedSourceLanguage(root)
                     };
                 }
@@ -337,7 +351,7 @@ namespace YaziciCS.Services
                     {
                         return null;
                     }
-                    return value;
+                    return SanitizeTranslatedText(value);
                 }
             }
             catch { }

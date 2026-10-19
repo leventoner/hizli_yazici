@@ -72,6 +72,18 @@ interface GoogleResult {
   detectedSourceLanguage?: string;
 }
 
+/**
+ * Çeviri metnindeki control karakterleri ve nesne yer tutucularını temizler.
+ * Bu karakterler UI'da "OBJ" kutucukları olarak görünür.
+ * Performans için sadece gerekli karakterleri temizler.
+ */
+function sanitizeTranslatedText(text: string): string {
+  if (!text) return text;
+  // U+FFFC (OBJECT REPLACEMENT CHARACTER) ve diğer control karakterleri temizle
+  // \p{Cc} = control characters, \p{Cf} = format characters
+  return text.replace(/[\uFFFC\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2060-\u2064\uFEFF]/g, '');
+}
+
 async function tryGoogleKeyless(text: string, target: string): Promise<GoogleResult | null> {
   try {
     const uri = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=${encodeURIComponent(target)}&q=${encodeURIComponent(text)}`;
@@ -101,7 +113,7 @@ function parseGoogleKeylessResult(json: any): GoogleResult | null {
     if (json.sentences && Array.isArray(json.sentences)) {
       const translated = json.sentences.map((s: any) => s.trans || '').join('').trim();
       return {
-        translatedText: translated,
+        translatedText: sanitizeTranslatedText(translated),
         detectedSourceLanguage: json.src || undefined,
       };
     }
@@ -126,7 +138,7 @@ function parseGoogleKeylessResult(json: any): GoogleResult | null {
       }
 
       return {
-        translatedText: translated.trim(),
+        translatedText: sanitizeTranslatedText(translated.trim()),
         detectedSourceLanguage: detectedLang,
       };
     }
@@ -204,7 +216,7 @@ async function tryMyMemory(text: string, target: string, email?: string): Promis
       ) {
         return null;
       }
-      translatedParts.push(value.trim());
+      translatedParts.push(sanitizeTranslatedText(value.trim()));
     }
 
     return translatedParts.join(' ');
