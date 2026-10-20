@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Forms;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -61,7 +62,12 @@ namespace YaziciCS.UI
             double dipTopY = physTopY / scaleY;
             double dipBottomY = physBottomY / scaleY;
 
-            var workArea = SystemParameters.WorkArea;
+            // Çalışma alanı: seçimin bulunduğu EKRANIN çalışma alanı kullanılmalı.
+            // SystemParameters.WorkArea yalnızca ANA ekranı kapsar; çoklu ekran
+            // kurulumunda ikinci ekranda yapılan seçimlerde menü ana ekrana
+            // konumlanır ve kullanıcı tarafından görülemez.
+            Rect workArea = GetWorkAreaForPoint(dipCenterX, dipTopY, scaleX, scaleY);
+
             double menuWidth = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : 268);
             double menuHeight = ActualHeight > 0 ? ActualHeight : (Height > 0 ? Height : 48);
 
@@ -93,9 +99,74 @@ namespace YaziciCS.UI
             hideTimer.Interval = TimeSpan.FromSeconds(SettingsManager.Current.FloatingMenuDuration);
             hideTimer.Start();
 
-            Show();
-            var anim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150));
-            BeginAnimation(OpacityProperty, anim);
+            // ÖNCEKI animasyonu temizle: aksi halde yeni animasyon "from" değeri
+            // eski animasyonun bitiş değerinden başlar ve menü hiç görünmez.
+            BeginAnimation(OpacityProperty, null);
+
+            if (!IsVisible)
+            {
+                Show();
+            }
+
+            // Pencere opaklığı doğrudan 1 yapılır.
+            //
+            // ÖNEMLİ: Opacity ÖZELLİĞİ üzerinde animasyon başlatmak pencereyi
+            // tamamen saydam bırakıyordu (Win32 alpha = 0). WPF'in AllowsTransparency
+            // + per-pixel alpha yolunda Opacity animasyonu, pencere içeriğini
+            // hiç boyamadan yalnızca pencere katmanının alphasını güncelliyor ve
+            // sonuçta hiçbir şey görünmüyordu.
+            // Bu yüzden animasyon pencerenin Opacity'sine değil, İÇERİĞE uygulanır.
+            Opacity = 1;
+
+            if (menuContent != null)
+            {
+                menuContent.BeginAnimation(UIElement.OpacityProperty, null);
+                menuContent.Opacity = 0;
+                var contentAnim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150))
+                {
+                    FillBehavior = FillBehavior.HoldEnd
+                };
+                menuContent.BeginAnimation(UIElement.OpacityProperty, contentAnim);
+            }
+
+            // Topmost ve Z sırasını yeniden uygula (pencere yeniden gösterildiğinde
+            // arka pencerelerin altında kalabiliyor).
+            Topmost = true;
+            if (!IsVisible) Show();
+        }
+
+        /// <summary>
+        /// Verilen fiziksel noktanın bulunduğu ekranın çalışma alanını (DIP) döndürür.
+        /// Hiçbir ekranla eşleşmezse ana ekranın çalışma alanına düşer.
+        /// </summary>
+        private static Rect GetWorkAreaForPoint(double physX, double physY, double scaleX, double scaleY)
+        {
+            try
+            {
+                var screens = Screen.AllScreens;
+                if (screens.Length > 0)
+                {
+                    // Ekranlar DIP koordinatlarında döner; fiziksel piksele çevirip karşılaştır.
+                    foreach (var screen in screens)
+                    {
+                        var wa = screen.WorkingArea; // System.Drawing.Rectangle (DIP)
+                        Rect bounds = new Rect(wa.Left, wa.Top, wa.Width, wa.Height);
+                        double leftPx = bounds.Left * scaleX;
+                        double topPx = bounds.Top * scaleY;
+                        double rightPx = bounds.Right * scaleX;
+                        double bottomPx = bounds.Bottom * scaleY;
+
+                        if (physX >= leftPx && physX < rightPx &&
+                            physY >= topPx && physY < bottomPx)
+                        {
+                            return bounds;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return SystemParameters.WorkArea;
         }
 
         public void HideMenu(bool actionExecuted = false)
@@ -105,9 +176,28 @@ namespace YaziciCS.UI
             {
                 SelectionManager.OnMenuDismissed();
             }
-            var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(100));
-            anim.Completed += (s, e) => Hide();
-            BeginAnimation(OpacityProperty, anim);
+
+            // Animasyon pencerenin Opacity'sine değil İÇERİĞE uygulanır.
+            // (Pencere Opacity'sinde animasyon, pencereyi tamamen saydam bırakıyordu.)
+            if (menuContent != null)
+            {
+                menuContent.BeginAnimation(UIElement.OpacityProperty, null);
+                var anim = new DoubleAnimation(menuContent.Opacity, 0, TimeSpan.FromMilliseconds(100))
+                {
+                    FillBehavior = FillBehavior.HoldEnd
+                };
+                anim.Completed += (s, e) =>
+                {
+                    menuContent.BeginAnimation(UIElement.OpacityProperty, null);
+                    menuContent.Opacity = 1;
+                    Hide();
+                };
+                menuContent.BeginAnimation(UIElement.OpacityProperty, anim);
+            }
+            else
+            {
+                Hide();
+            }
         }
 
         private async void BtnFix_Click(object sender, RoutedEventArgs e)

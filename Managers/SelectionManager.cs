@@ -18,18 +18,33 @@ namespace YaziciCS.Managers
         private static GlobalMouseHook? mouseHook;
         private static FloatingMenu? menu;
 
+        // NOT: Win32 INPUT yapısı x64'te 40 bayt olmalıdır (type + 4 bayt hizalama + 32 baytlık union).
+        // Union'un MOUSEINPUT kolu da tanımlanmalıdır; aksi halde Marshal boyutu 32 çıkar ve
+        // SendInput(cbSize=32) sessizce BAŞARISIZ olur (girdi hiç enjekte edilmez).
         [StructLayout(LayoutKind.Sequential)]
         private struct INPUT
         {
             public uint type;
-            public MOUSEKEYBDHARDWAREINPUT mkhi;
+            public INPUTUNION u;
         }
 
         [StructLayout(LayoutKind.Explicit)]
-        private struct MOUSEKEYBDHARDWAREINPUT
+        private struct INPUTUNION
         {
-            [FieldOffset(0)]
-            public KEYBDINPUT ki;
+            [FieldOffset(0)] public MOUSEINPUT mi;
+            [FieldOffset(0)] public KEYBDINPUT ki;
+            [FieldOffset(0)] public HARDWAREINPUT hi;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public UIntPtr dwExtraInfo;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -40,6 +55,14 @@ namespace YaziciCS.Managers
             public uint dwFlags;
             public uint time;
             public UIntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct HARDWAREINPUT
+        {
+            public uint uMsg;
+            public ushort wParamL;
+            public ushort wParamH;
         }
 
         private const uint INPUT_KEYBOARD = 1;
@@ -221,34 +244,33 @@ namespace YaziciCS.Managers
             {
                 // 1. Panoyu kirletmeden önce UI Automation ile seçili metni ve kesin ekran koordinatlarını oku
                 string? uiText = GetSelectedTextViaUIAutomation(out double? uiaCenterX, out double? uiaTopY, out double? uiaBottomY);
-                if (uiText != null)
+                if (!string.IsNullOrEmpty(uiText))
                 {
                     string trimmedUi = uiText.Trim();
                     // En az 2 harfli kelimeleri ("ev", "su", "at", "to", "go") kabul et
-                    if (trimmedUi.Length < 2 || CountLetters(trimmedUi) < 2)
+                    if (trimmedUi.Length >= 2 && CountLetters(trimmedUi) >= 2)
                     {
-                        selectedText = null;
+                        // ÖNEMLİ: Pano burada DEĞİŞTİRİLMEZ. Sadece seçilen metin bellekte tutulur.
+                        selectedText = trimmedUi;
+
+                        double finalCenterX = uiaCenterX ?? centerX;
+                        double finalTopY = uiaTopY ?? topY;
+                        double finalBottomY = uiaBottomY ?? bottomY;
+
+                        Application.Current?.Dispatcher?.BeginInvoke(() =>
+                        {
+                            if (reqId == currentRequestId)
+                            {
+                                menu?.ShowAt(finalCenterX, finalTopY, finalBottomY);
+                            }
+                        });
                         return;
                     }
-
-                    // ÖNEMLİ: Pano burada DEĞİŞTİRİLMEZ. Sadece seçilen metin bellekte tutulur.
-                    selectedText = trimmedUi;
-
-                    double finalCenterX = uiaCenterX ?? centerX;
-                    double finalTopY = uiaTopY ?? topY;
-                    double finalBottomY = uiaBottomY ?? bottomY;
-
-                    Application.Current?.Dispatcher?.BeginInvoke(() =>
-                    {
-                        if (reqId == currentRequestId)
-                        {
-                            menu?.ShowAt(finalCenterX, finalTopY, finalBottomY);
-                        }
-                    });
-                    return;
                 }
 
-                // 2. UI Automation desteklenmeyen pencerelerde (Chromium vb.) Ctrl+C simülasyonu
+                // 2. UI Automation metin döndüremediyse (Chromium, Word, bazı Win32 pencereler)
+                //    Ctrl+C simülasyonu ile panoya kopyalayıp metni oradan okuyoruz.
+                //    (Eski kodda burada "return" vardı ve menü hiç açılmıyordu.)
                 if (IsConsoleWindowActive())
                 {
                     return;
@@ -321,21 +343,27 @@ namespace YaziciCS.Managers
 
             // Ctrl DOWN
             inputs[0].type = INPUT_KEYBOARD;
-            inputs[0].mkhi.ki = new KEYBDINPUT { wVk = VK_CONTROL, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+            inputs[0].u.ki = new KEYBDINPUT { wVk = VK_CONTROL, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
 
             // C DOWN
             inputs[1].type = INPUT_KEYBOARD;
-            inputs[1].mkhi.ki = new KEYBDINPUT { wVk = VK_C, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+            inputs[1].u.ki = new KEYBDINPUT { wVk = VK_C, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
 
             // C UP
             inputs[2].type = INPUT_KEYBOARD;
-            inputs[2].mkhi.ki = new KEYBDINPUT { wVk = VK_C, dwFlags = KEYEVENTF_KEYUP, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+            inputs[2].u.ki = new KEYBDINPUT { wVk = VK_C, dwFlags = KEYEVENTF_KEYUP, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
 
             // Ctrl UP
             inputs[3].type = INPUT_KEYBOARD;
-            inputs[3].mkhi.ki = new KEYBDINPUT { wVk = VK_CONTROL, dwFlags = KEYEVENTF_KEYUP, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
+            inputs[3].u.ki = new KEYBDINPUT { wVk = VK_CONTROL, dwFlags = KEYEVENTF_KEYUP, dwExtraInfo = (UIntPtr)APP_INPUT_SIGNATURE };
 
-            SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+            uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+            if (sent != inputs.Length)
+            {
+                CrashLogger.Log(new InvalidOperationException(
+                    $"SendInput başarısız: {sent}/{inputs.Length} girdi gönderildi (cbSize={Marshal.SizeOf(typeof(INPUT))})."),
+                    "SelectionManager.SimulateCtrlC");
+            }
         }
 
         private static string? GetSelectedTextViaUIAutomation(out double? centerX, out double? topY, out double? bottomY)

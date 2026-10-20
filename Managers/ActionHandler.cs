@@ -11,22 +11,14 @@ namespace YaziciCS.Managers
         public static Action<string, string, string>? ShowNotification { get; set; }
         public static Action<string, string, string>? ShowTranslationResult { get; set; }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-
-        private const byte VK_CONTROL = 0x11;
-        private const byte VK_C = 0x43;
-        private const uint KEYEVENTF_KEYUP = 0x0002;
-
         private static async Task SimulateCtrlC()
         {
             // Wait for menu to hide and focus to return to the original window
             await Task.Delay(250);
-            
-            keybd_event(VK_CONTROL, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
-            keybd_event(VK_C, 0, 0, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
-            keybd_event(VK_C, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
-            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, (UIntPtr)SelectionManager.APP_INPUT_SIGNATURE);
+
+            // Ortak ve doğrulanmış SendInput uygulaması kullanılır.
+            SelectionManager.SimulateCtrlC();
+
             await Task.Delay(500);
         }
 

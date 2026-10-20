@@ -4,7 +4,7 @@
         Title="FloatingMenu" Height="48" Width="268"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="True"
-        Opacity="0" Loaded="Window_Loaded">
+        Opacity="1" Loaded="Window_Loaded">
     
     <Window.Resources>
         <Style x:Key="MenuButtonStyle" TargetType="Button">
@@ -43,7 +43,7 @@
         </Style>
     </Window.Resources>
     
-    <Border CornerRadius="10" BorderThickness="1" Padding="6,4">
+    <Border x:Name="menuContent" CornerRadius="10" BorderThickness="1" Padding="6,4">
         <Border.BorderBrush>
             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                 <GradientStop Color="{Binding ThemeColor.Color}" Offset="0"/>
