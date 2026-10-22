@@ -68,7 +68,7 @@ namespace YaziciCS.UI
             // konumlanır ve kullanıcı tarafından görülemez.
             Rect workArea = GetWorkAreaForPoint(dipCenterX, dipTopY, scaleX, scaleY);
 
-            double menuWidth = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : 268);
+            double menuWidth = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : 228);
             double menuHeight = ActualHeight > 0 ? ActualHeight : (Height > 0 ? Height : 48);
 
             // Yatay ortalama ve çalışma alanı sınırları
@@ -202,10 +202,7 @@ namespace YaziciCS.UI
 
         private async void BtnFix_Click(object sender, RoutedEventArgs e)
         {
-            string? source = SelectionManager.GetSelectedText();
-            SelectionManager.NotifyActionExecuted();
-            HideMenu(actionExecuted: true);
-            await ActionHandler.HandleFixClipboardAsync(triggerCopy: false, sourceText: source);
+            BtnImprove_Click(sender, e);
         }
 
         private async void BtnImprove_Click(object sender, RoutedEventArgs e)

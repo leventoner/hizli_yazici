@@ -3,7 +3,7 @@ import { Wand2, Globe, Mic, Copy, Check, Pencil } from 'lucide-react';
 
 interface FloatingMenuProps {
   themeColor: string;
-  onFix: () => void;
+  onFix?: () => void;
   onImprove: () => void;
   onTranslateEn: () => void;
   onTranslateFr: () => void;
@@ -62,28 +62,16 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
           boxShadow: `0 0 15px ${themeColor}33`,
         }}
       >
-        {/* Karakter Düzelt (Pencil / Deasciifier) */}
-        <button
-          type="button"
-          onClick={onFix}
-          disabled={isLoading}
-          title="Karakter Düzelt (ç, ğ, ı, ö, ş, ü)"
-          className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40"
-        >
-          <Pencil className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-          <span className="sr-only">Karakter Düzelt</span>
-        </button>
-
-        {/* Metni İyileştir (Metin Sihirbazı - Kendi Dilinde) */}
+        {/* Metni Düzelt ve İyileştir (Karakter, İmla, Noktalama) */}
         <button
           type="button"
           onClick={onImprove}
           disabled={isLoading}
-          title="Metin Sihirbazı (Düzelt ve İyileştir)"
+          title="Metni Düzelt ve İyileştir (Karakter, İmla, Noktalama)"
           className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40"
         >
           <Wand2 className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-          <span className="sr-only">Metni İyileştir</span>
+          <span className="sr-only">Metni Düzelt ve İyileştir</span>
         </button>
 
         {/* Çevir EN (Türkçe ↔ İngilizce / Sözlük) */}

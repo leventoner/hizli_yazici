@@ -1,7 +1,7 @@
 <Window x:Class="YaziciCS.UI.FloatingMenu"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FloatingMenu" Height="48" Width="268"
+        Title="FloatingMenu" Height="48" Width="228"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="True"
         Opacity="1" Loaded="Window_Loaded">
@@ -61,23 +61,13 @@
         </Border.Effect>
         
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <!-- Karakter Düzelt (Pencil / Edit) -->
-            <Button x:Name="BtnFix" Style="{StaticResource MenuButtonStyle}" ToolTip="Karakter Düzelt (ç, ğ, ı, ö, ş, ü)" Click="BtnFix_Click">
-                <Viewbox Width="17" Height="17">
-                    <Canvas Width="24" Height="24">
-                        <Path Data="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z M15 5l4 4" 
-                              Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                    </Canvas>
-                </Viewbox>
-            </Button>
-
-            <!-- Metni İyileştir (Metin Sihirbazı) -->
-            <Button x:Name="BtnImprove" Style="{StaticResource MenuButtonStyle}" ToolTip="Metin Sihirbazı (Düzelt ve İyileştir)" Click="BtnImprove_Click">
+            <!-- Akıllı Metin Düzelt ve İyileştir (Karakter, İmla, Noktalama) -->
+            <Button x:Name="BtnImprove" Style="{StaticResource MenuButtonStyle}" ToolTip="Metni Düzelt ve İyileştir (Karakter, İmla, Noktalama)" Click="BtnImprove_Click">
                 <Viewbox Width="18" Height="18">
                     <Canvas Width="24" Height="24">
-                        <Path Data="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z M14 7l3 3"
+                        <Path Data="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z M14 7l3 3" 
                               Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                        <Path Data="M5 6v4 M7 8H3 M19 14v4 M21 16h-4 M10 2v2 M11 3H9"
+                        <Path Data="M5 6v4 M7 8H3 M19 14v4 M21 16h-4 M10 2v2 M11 3H9" 
                               Stroke="#FBBF24" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     </Canvas>
                 </Viewbox>

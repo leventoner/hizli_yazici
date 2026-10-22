@@ -37,7 +37,7 @@ namespace YaziciCS.Managers
                 double diff = (now - lastCtrlCTime).TotalSeconds;
                 if (diff <= SettingsManager.Current.Cooldown && diff > 0.05)
                 {
-                    Task.Run(async () => await ActionHandler.HandleFixClipboardAsync(triggerCopy: false));
+                    Task.Run(async () => await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false));
                 }
                 lastCtrlCTime = now;
             }

@@ -167,13 +167,8 @@ export const App: React.FC = () => {
           setIsAudioModalOpen(true);
         }
       }
-      // Ctrl+Shift+D for quick deasciify
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
-        handleFixCharacters();
-      }
-      // Ctrl+Shift+I for AI improve
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') {
+      // Ctrl+Shift+D veya Ctrl+Shift+I: Akıllı Düzelt & İyileştir
+      if (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'i')) {
         e.preventDefault();
         handleImproveText();
       }
@@ -710,23 +705,13 @@ export const App: React.FC = () => {
               {/* Fixed Desktop App Actions Toolbar */}
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={handleFixCharacters}
-                  disabled={isLoading}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40"
-                  title="Türkçe Karakter Düzelt (ç, ğ, ı, ö, ş, ü)"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Karakter Düzelt</span>
-                </button>
-
-                <button
                   onClick={handleImproveText}
                   disabled={isLoading}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40"
-                  title="Yapay Zeka ile Metni İyileştir"
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40"
+                  title="Metni Düzelt ve İyileştir (Karakter, İmla, Noktalama)"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>İyileştir</span>
+                  <span>Düzelt & İyileştir</span>
                 </button>
 
                 <button

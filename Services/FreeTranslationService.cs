@@ -12,7 +12,12 @@ namespace YaziciCS.Services
 {
     public static class FreeTranslationService
     {
-        private static readonly HttpClient HttpClient = new HttpClient();
+        private static readonly HttpClient HttpClient = new HttpClient(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            ConnectTimeout = TimeSpan.FromSeconds(6),
+            AutomaticDecompression = System.Net.DecompressionMethods.All
+        });
         private const int MyMemoryMaxChunkBytes = 450;
 
         public static async Task<string> TranslateAsync(string text, string foreignLang = "en")
