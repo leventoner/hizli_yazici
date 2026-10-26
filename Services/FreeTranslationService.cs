@@ -47,6 +47,65 @@ namespace YaziciCS.Services
         public static Task<string> TranslateFrenchAsync(string text) => TranslateAsync(text, "fr");
         public static Task<string> TranslateDutchAsync(string text) => TranslateAsync(text, "nl");
 
+        /// <summary>
+        /// Belirtilen kaynak ve hedef diller arasında doğrudan sözlük/çeviri yapar.
+        /// Desteklenen diller: tr, en, fr, nl
+        /// </summary>
+        public static async Task<string> TranslateDirectAsync(string text, string sourceLang, string targetLang)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+
+            sourceLang = string.IsNullOrWhiteSpace(sourceLang) ? "tr" : sourceLang.ToLowerInvariant();
+            targetLang = string.IsNullOrWhiteSpace(targetLang) ? "en" : targetLang.ToLowerInvariant();
+
+            // Aynı dil seçildiyse doğrudan metni dön
+            if (sourceLang.Equals(targetLang, StringComparison.OrdinalIgnoreCase))
+            {
+                return text;
+            }
+
+            try
+            {
+                string uri = "https://clients5.google.com/translate_a/t" +
+                             "?client=dict-chrome-ex" +
+                             "&sl=" + Uri.EscapeDataString(sourceLang) +
+                             "&tl=" + Uri.EscapeDataString(targetLang) +
+                             "&q=" + Uri.EscapeDataString(text);
+
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(12));
+                using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                request.Headers.TryAddWithoutValidation("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+
+                var response = await HttpClient.SendAsync(request, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    string json = await response.Content.ReadAsStringAsync();
+                    var res = ParseGoogleKeylessResult(json);
+                    if (!string.IsNullOrEmpty(res?.TranslatedText))
+                    {
+                        return res.TranslatedText;
+                    }
+                }
+            }
+            catch { }
+
+            // MyMemory yedeği
+            try
+            {
+                string langPair = $"{sourceLang}|{targetLang}";
+                string uri = "https://api.mymemory.translated.net/get?q=" + Uri.EscapeDataString(text) +
+                             "&langpair=" + Uri.EscapeDataString(langPair);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(12));
+                string json = await HttpClient.GetStringAsync(uri, cts.Token);
+                string? part = ParseMyMemoryResponse(json, text);
+                if (!string.IsNullOrEmpty(part)) return part!;
+            }
+            catch { }
+
+            return "Sonuç bulunamadı.";
+        }
+
         internal static string DetectTargetLanguage(string text, string foreignLang = "en")
         {
             if (foreignLang.Equals("fr", StringComparison.OrdinalIgnoreCase))

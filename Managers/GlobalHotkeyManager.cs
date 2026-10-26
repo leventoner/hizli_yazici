@@ -32,12 +32,20 @@ namespace YaziciCS.Managers
             // VK_C = 0x43
             else if (vkCode == 0x43 && isDown && isCtrlDown && !isShiftDown)
             {
-                SelectionManager.NotifyActionExecuted();
                 var now = DateTime.Now;
                 double diff = (now - lastCtrlCTime).TotalSeconds;
                 if (diff <= SettingsManager.Current.Cooldown && diff > 0.05)
                 {
-                    Task.Run(async () => await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false));
+                    string? source = SelectionManager.GetSelectedText();
+                    SelectionManager.NotifyActionExecuted();
+
+                    Task.Run(async () =>
+                    {
+                        // Aktif uygulamanın (Chrome, Word vb.) 2. Ctrl+C tuşunu işleyip
+                        // panoya eski metni yazmasını bekle (yarış durumunu / race condition kesin önle)
+                        await Task.Delay(120);
+                        await ActionHandler.HandleImproveClipboardAsync(triggerCopy: false, sourceText: source);
+                    });
                 }
                 lastCtrlCTime = now;
             }

@@ -15,6 +15,7 @@ namespace YaziciCS
         private FloatingMenu? floatingMenu;
         private SettingsWindow? settingsWindow;
         private TranslationResultWindow? translationResultWindow;
+        private DictionaryWindow? dictionaryWindow;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -75,6 +76,7 @@ namespace YaziciCS
             notifyIcon.Visible = true;
 
             var contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add("📖 Sözlük & Çeviri", null, (s, e) => OpenDictionary());
             contextMenu.Items.Add("🎙️ Sesle Yaz (Ctrl+Shift+Y)", null, (s, e) => _ = ActionHandler.HandleSpeechToTextAsync());
             contextMenu.Items.Add(new ToolStripSeparator());
             contextMenu.Items.Add("⚙️ Ayarlar", null, (s, e) => OpenSettings());
@@ -139,6 +141,25 @@ namespace YaziciCS
             {
                 settingsWindow.Activate();
             }
+        }
+
+        public void OpenDictionary()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (dictionaryWindow == null || !dictionaryWindow.IsLoaded)
+                {
+                    dictionaryWindow = new DictionaryWindow();
+                    dictionaryWindow.Closed += (s, e) => dictionaryWindow = null;
+                    dictionaryWindow.Show();
+                }
+                else
+                {
+                    if (dictionaryWindow.WindowState == WindowState.Minimized)
+                        dictionaryWindow.WindowState = WindowState.Normal;
+                    dictionaryWindow.Activate();
+                }
+            });
         }
 
         private void ExitApplication()

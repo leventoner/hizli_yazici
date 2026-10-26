@@ -1,0 +1,336 @@
+<Window x:Class="YaziciCS.UI.DictionaryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sözlük &amp; Çeviri"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="False" ShowInTaskbar="True" WindowStartupLocation="CenterScreen"
+        Width="580" MinHeight="420" MaxHeight="680"
+        Loaded="Window_Loaded" KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2A3447"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#3B4861"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1E2638"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1D4ED8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1E40AF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ComboBox ToggleButton Template for Dark Theme -->
+        <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
+            <Border x:Name="templateRoot" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="8">
+                <Border Width="26" HorizontalAlignment="Right" Margin="0,0,4,0">
+                    <Path x:Name="arrow" Data="M 0 0 L 4.5 4.5 L 9 0 Z" Fill="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="templateRoot" Property="BorderBrush" Value="#38BDF8"/>
+                    <Setter TargetName="arrow" Property="Fill" Value="#38BDF8"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="templateRoot" Property="BorderBrush" Value="#2563EB"/>
+                    <Setter TargetName="arrow" Property="Fill" Value="#38BDF8"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Modern Dark ComboBox Style -->
+        <Style x:Key="LangComboStyle" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Background" Value="#1E293B"/>
+                        <Setter Property="Foreground" Value="#F8FAFC"/>
+                        <Setter Property="Padding" Value="12,8"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="itemBorder" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="itemBorder" Property="Background" Value="#2563EB"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="itemBorder" Property="Background" Value="#1D4ED8"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton" 
+                                          Template="{StaticResource ComboBoxToggleButton}" 
+                                          Focusable="False" 
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                          ClickMode="Press"/>
+                            <ContentPresenter Name="ContentSite" 
+                                              IsHitTestVisible="False" 
+                                              Content="{TemplateBinding SelectionBoxItem}" 
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" 
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" 
+                                              Margin="12,0,28,0" 
+                                              VerticalAlignment="Center" 
+                                              HorizontalAlignment="Left">
+                                <ContentPresenter.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#F8FAFC"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </Style>
+                                </ContentPresenter.Resources>
+                            </ContentPresenter>
+                            <Popup Name="Popup" 
+                                   Placement="Bottom" 
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" 
+                                   AllowsTransparency="True" 
+                                   Focusable="False" 
+                                   PopupAnimation="Slide">
+                                <Grid Name="DropDown" 
+                                      SnapsToDevicePixels="True" 
+                                      MinWidth="{TemplateBinding ActualWidth}" 
+                                      MaxHeight="260">
+                                    <Border x:Name="DropDownBorder" 
+                                            Background="#1E293B" 
+                                            BorderThickness="1" 
+                                            BorderBrush="#334155" 
+                                            CornerRadius="8" 
+                                            Margin="0,4,0,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.6"/>
+                                        </Border.Effect>
+                                        <ScrollViewer Margin="2" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="MainBorder" CornerRadius="16" BorderThickness="1.5" Margin="12"
+            Background="#121826" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+        <Border.BorderBrush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#3B82F6" Offset="0"/>
+                <GradientStop Color="#1E293B" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.BorderBrush>
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.75" Color="#000000"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 0: Header -->
+                <RowDefinition Height="Auto"/> <!-- 1: Language Selector Row -->
+                <RowDefinition Height="Auto"/> <!-- 2: Search Input & Bul Button -->
+                <RowDefinition Height="*"/>    <!-- 3: Result Area -->
+                <RowDefinition Height="Auto"/> <!-- 4: Footer -->
+            </Grid.RowDefinitions>
+
+            <!-- 0: Header Bar -->
+            <Border Grid.Row="0" Background="#182234" CornerRadius="14,14,0,0" Padding="18,12" BorderThickness="0,0,0,1" BorderBrush="#243046">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📖" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Sözlük &amp; Anlam Arama" FontWeight="Bold" FontSize="15" Foreground="#F1F5F9" FontFamily="Segoe UI" VerticalAlignment="Center"/>
+                        <Border Background="#2563EB" CornerRadius="6" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="4 Dil Destekli" FontSize="10.5" FontWeight="SemiBold" Foreground="White" FontFamily="Segoe UI"/>
+                        </Border>
+                    </StackPanel>
+
+                    <Button Grid.Column="1" x:Name="BtnClose" Style="{StaticResource ActionButtonStyle}" Width="32" Height="30" Padding="0" Click="BtnClose_Click" ToolTip="Kapat (ESC)">
+                        <TextBlock Text="✕" FontSize="13" FontWeight="Bold" Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- 1: Language Selector Row (Kaynak Dil ➔ Hedef Dil) -->
+            <Border Grid.Row="1" Background="#0F172A" Padding="18,12" BorderThickness="0,0,0,1" BorderBrush="#1E293B">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Kaynak Dil -->
+                    <StackPanel Grid.Column="0" Orientation="Vertical">
+                        <TextBlock Text="Kaynak Dil" FontSize="11.5" FontWeight="Medium" Foreground="#94A3B8" Margin="2,0,0,5" FontFamily="Segoe UI"/>
+                        <ComboBox x:Name="CmbSourceLang" Style="{StaticResource LangComboStyle}" SelectionChanged="CmbLang_SelectionChanged">
+                            <ComboBoxItem Tag="tr" Content="Türkçe (TR)" IsSelected="True"/>
+                            <ComboBoxItem Tag="en" Content="İngilizce (EN)"/>
+                            <ComboBoxItem Tag="fr" Content="Fransızca (FR)"/>
+                            <ComboBoxItem Tag="nl" Content="Hollandaca (NL)"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Swap Dilleri Değiştir Butonu -->
+                    <Button Grid.Column="1" x:Name="BtnSwapLang" Style="{StaticResource ActionButtonStyle}" Width="40" Height="36" Margin="12,18,12,0" VerticalAlignment="Center" Click="BtnSwapLang_Click" ToolTip="Dilleri Değiştir (⇄)">
+                        <TextBlock Text="⇄" FontSize="16" FontWeight="Bold" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+
+                    <!-- Hedef Dil -->
+                    <StackPanel Grid.Column="2" Orientation="Vertical">
+                        <TextBlock Text="Hedef Dil" FontSize="11.5" FontWeight="Medium" Foreground="#94A3B8" Margin="2,0,0,5" FontFamily="Segoe UI"/>
+                        <ComboBox x:Name="CmbTargetLang" Style="{StaticResource LangComboStyle}" SelectionChanged="CmbLang_SelectionChanged">
+                            <ComboBoxItem Tag="en" Content="İngilizce (EN)" IsSelected="True"/>
+                            <ComboBoxItem Tag="tr" Content="Türkçe (TR)"/>
+                            <ComboBoxItem Tag="fr" Content="Fransızca (FR)"/>
+                            <ComboBoxItem Tag="nl" Content="Hollandaca (NL)"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2: Search Input & "Bul" Button -->
+            <Border Grid.Row="2" Background="#121826" Padding="18,14,18,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Search Input Box -->
+                    <Border Grid.Column="0" Background="#1E293B" CornerRadius="8" BorderThickness="1" BorderBrush="#334155" Margin="0,0,8,0">
+                        <Grid>
+                            <TextBox x:Name="TxtSearch" Background="Transparent" Foreground="#F8FAFC" 
+                                     BorderThickness="0" Padding="10,8" FontSize="13.5" FontFamily="Segoe UI"
+                                     CaretBrush="#38BDF8" SelectionBrush="#2563EB"
+                                     KeyDown="TxtSearch_KeyDown" TextChanged="TxtSearch_TextChanged"/>
+                            <TextBlock x:Name="TxtPlaceholder" Text="Sözlükte aranacak kelime veya terimi yazın..." 
+                                       IsHitTestVisible="False" Foreground="#64748B" FontSize="13.5"
+                                       FontFamily="Segoe UI" Margin="12,8,0,0"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- "Bul" Butonu -->
+                    <Button Grid.Column="1" x:Name="BtnSearch" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSearch_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔍" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Bul" FontSize="13" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- 3: Result Area (Selectable, Copyable, Scrollable) -->
+            <Border Grid.Row="3" Background="#1E293B" CornerRadius="8" Margin="18,4,18,10" BorderThickness="1" BorderBrush="#334155">
+                <Grid>
+                    <!-- Loading Spinner / Message -->
+                    <StackPanel x:Name="PnlLoading" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" Margin="20">
+                        <TextBlock Text="⏳ Sözlükte aranıyor..." FontSize="13" Foreground="#38BDF8" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Result Content -->
+                    <ScrollViewer x:Name="ScrResult" VerticalScrollBarVisibility="Auto" Padding="12,10">
+                        <TextBox x:Name="TxtResult" IsReadOnly="True" TextWrapping="Wrap" 
+                                 Background="Transparent" Foreground="#F8FAFC" BorderThickness="0"
+                                 FontSize="14" FontFamily="Segoe UI" Padding="2"
+                                 SelectionBrush="#2563EB" Cursor="IBeam" Focusable="True"
+                                 Text="Kelimeyi yazıp 'Bul' butonuna veya Enter tuşuna basın."/>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- 4: Footer Bar (Kopyala, İstatistik ve Bilgi) -->
+            <Border Grid.Row="4" Background="#0F172A" CornerRadius="0,0,14,14" Padding="18,10" BorderThickness="0,1,0,0" BorderBrush="#1E293B">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Kopyala Butonu -->
+                    <Button Grid.Column="0" x:Name="BtnCopy" Style="{StaticResource ActionButtonStyle}" Click="BtnCopy_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📋" FontSize="12" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtCopyLabel" Text="Kopyala" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- İstatistik -->
+                    <TextBlock Grid.Column="1" x:Name="TxtStats" Text="" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="12,0,0,0" FontFamily="Segoe UI"/>
+
+                    <!-- İpucu -->
+                    <TextBlock Grid.Column="2" Text="ESC: Kapat | Enter: Ara" FontSize="11" Foreground="#475569" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Segoe UI"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

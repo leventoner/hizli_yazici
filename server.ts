@@ -6,7 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { Deasciifier } from './src/services/deasciifier.js';
-import { translateFree } from './src/services/freeTranslation.js';
+import { translateFree, translateDirectFree } from './src/services/freeTranslation.js';
 import { improveTurkishTextFree } from './src/services/freeTextImprover.js';
 import { extractSingleWord, lookupDictionary } from './src/services/dictionaryService.js';
 
@@ -159,9 +159,50 @@ app.post('/api/improve/stream', (req, res) => {
 // Translation (İki yönlü Türkçe ↔ EN, FR veya NL/Flamanca)
 app.post('/api/translate', async (req, res) => {
   try {
-    const { text, targetLanguage = 'en', provider = settings.translation_provider } = req.body;
+    const { text, targetLanguage = 'en', sourceLanguage, provider = settings.translation_provider } = req.body;
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: 'Metin parametresi zorunludur.' });
+    }
+
+    // Direct dictionary / custom source & target language pair
+    if (sourceLanguage && typeof sourceLanguage === 'string') {
+      const src = sourceLanguage.toLowerCase().trim();
+      const tgt = (targetLanguage || 'en').toLowerCase().trim();
+      let direct = await translateDirectFree(text, src, tgt, settings.translation_email);
+
+      if (!direct || direct === 'Sonuç bulunamadı.') {
+        if (process.env.GEMINI_API_KEY) {
+          try {
+            const ai = getGeminiClient();
+            const langNames: Record<string, string> = {
+              tr: 'Turkish',
+              en: 'English',
+              fr: 'French',
+              nl: 'Dutch',
+            };
+            const sName = langNames[src] || src;
+            const tName = langNames[tgt] || tgt;
+            const prompt = `Translate the following text from ${sName} to ${tName}. If it is a single word, return its primary dictionary translation/meanings in ${tName}. Return ONLY the translated text without markdown quotes or introductions:\n"""\n${text}\n"""`;
+            const resp = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+            const genText = resp.text?.trim();
+            if (genText) direct = genText;
+          } catch (aiErr) {
+            console.warn('AI fallback failed for direct translate:', aiErr);
+          }
+        }
+      }
+
+      return res.json({
+        original: text,
+        translated: direct,
+        sourceLanguage: src,
+        targetLanguage: tgt,
+        provider: 'direct',
+        isDictionary: false,
+      });
     }
 
     const lang = targetLanguage.toLowerCase();

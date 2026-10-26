@@ -15,6 +15,8 @@ export interface AppSettings {
   improve_provider: 'auto' | 'free' | 'gemini';
   auto_copy_on_action: boolean;
   hasGeminiKey?: boolean;
+  dictionary_source_lang?: string;
+  dictionary_target_lang?: string;
 }
 
 export interface ToastMessage {

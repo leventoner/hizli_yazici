@@ -78,6 +78,15 @@ namespace YaziciCS.Managers
             if (text.Trim() != improved.Trim())
             {
                 await TextService.SetClipboardTextAsync(improved);
+
+                // Tarayıcıların (Chrome/Edge) gecikmeli WM_COPY yazımına karşı panoyu doğrula
+                await Task.Delay(40);
+                string current = await TextService.GetClipboardTextAsync();
+                if (current.Trim() != improved.Trim())
+                {
+                    await TextService.SetClipboardTextAsync(improved);
+                }
+
                 ShowNotification?.Invoke("Metin İyileştirildi!", improved, "#9b59b6");
             }
             else if (SettingsManager.Current.NotifyOnNoChange)

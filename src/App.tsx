@@ -16,6 +16,7 @@ import {
   Layers,
   ArrowRightLeft,
   Volume2,
+  BookOpen,
 } from 'lucide-react';
 import { AppSettings, ToastMessage, HistoryItem, TranslationModalState } from './types';
 import { Deasciifier } from './services/deasciifier';
@@ -26,6 +27,7 @@ import { NotificationToast } from './components/NotificationToast';
 import { AudioRecorderModal } from './components/AudioRecorderModal';
 import { DiffViewer } from './components/DiffViewer';
 import { TranslationResultModal } from './components/TranslationResultModal';
+import { DictionaryModal } from './components/DictionaryModal';
 import { extractSingleWord } from './services/dictionaryService';
 
 const PRESETS = [
@@ -99,10 +101,13 @@ export const App: React.FC = () => {
     improve_provider: 'auto',
     auto_copy_on_action: true,
     hasGeminiKey: false,
+    dictionary_source_lang: 'tr',
+    dictionary_target_lang: 'en',
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -543,6 +548,15 @@ export const App: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setIsDictionaryOpen(true)}
+              className="p-2 rounded-xl text-xs font-medium bg-blue-950/40 border border-blue-500/40 text-blue-300 hover:bg-blue-900/60 hover:text-white flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Sözlük & Çeviri (4 Dil)"
+            >
+              <BookOpen className="w-4 h-4 text-blue-400" />
+              <span className="hidden sm:inline">Sözlük</span>
+            </button>
+
+            <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-1.5 transition-colors"
               title="Ayarlar"
@@ -943,6 +957,14 @@ export const App: React.FC = () => {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSave={handleSaveSettings}
+      />
+
+      {/* Dictionary Modal */}
+      <DictionaryModal
+        isOpen={isDictionaryOpen}
+        onClose={() => setIsDictionaryOpen(false)}
+        settings={settings}
+        onUpdateSettings={handleSaveSettings}
       />
 
       {/* Voice to Text Recording Modal */}

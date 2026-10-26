@@ -49,6 +49,12 @@ namespace YaziciCS.Managers
         [JsonPropertyName("stt_provider")]
         public string SttProvider { get; set; } = "local";
 
+        [JsonPropertyName("dictionary_source_lang")]
+        public string DictionarySourceLang { get; set; } = "tr";
+
+        [JsonPropertyName("dictionary_target_lang")]
+        public string DictionaryTargetLang { get; set; } = "en";
+
         [JsonIgnore]
         public string GeminiApiKey { get; set; } = "";
     }

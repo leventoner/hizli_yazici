@@ -253,3 +253,61 @@ export async function translateFree(text: string, foreignLang = 'en', email?: st
 
   throw new Error('Ücretsiz çeviri servislerine ulaşılamadı. Lütfen bağlantınızı veya Gemini sağlayıcısını kontrol edin.');
 }
+
+/**
+ * Belirtilen kaynak ve hedef diller (tr, en, fr, nl) arasında doğrudan sözlük/çeviri yapar.
+ */
+export async function translateDirectFree(
+  text: string,
+  sourceLang = 'tr',
+  targetLang = 'en',
+  email?: string
+): Promise<string> {
+  if (!text || !text.trim()) return '';
+
+  sourceLang = sourceLang.toLowerCase().trim();
+  targetLang = targetLang.toLowerCase().trim();
+
+  if (sourceLang === targetLang) return text;
+
+  try {
+    const uri = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${encodeURIComponent(sourceLang)}&tl=${encodeURIComponent(targetLang)}&q=${encodeURIComponent(text)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(uri, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      let translated = '';
+      if (data && typeof data === 'object' && Array.isArray(data.sentences)) {
+        translated = data.sentences.map((s: any) => s.trans || '').join('');
+      } else if (Array.isArray(data) && data[0]) {
+        translated = Array.isArray(data[0]) ? data[0].map((s: any) => s[0] || '').join('') : String(data[0]);
+      }
+      if (translated) {
+        return sanitizeTranslatedText(translated.trim());
+      }
+    }
+  } catch {}
+
+  // MyMemory yedeği
+  try {
+    const langPair = `${sourceLang}|${targetLang}`;
+    const uri = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langPair)}${email ? `&de=${encodeURIComponent(email)}` : ''}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(uri, { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const json = await res.json();
+      const val = json?.responseData?.translatedText;
+      if (val && typeof val === 'string' && !val.toUpperCase().startsWith('MYMEMORY')) {
+        return sanitizeTranslatedText(val.trim());
+      }
+    }
+  } catch {}
+
+  return 'Sonuç bulunamadı.';
+}
+
