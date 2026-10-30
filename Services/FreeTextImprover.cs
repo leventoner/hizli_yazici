@@ -81,7 +81,6 @@ namespace YaziciCS.Services
         private static readonly Regex MultipleSpacesRegex = new Regex(@"\s+", RegexOptions.Compiled);
         private static readonly Regex SpacingBeforePunctRegex = new Regex(@"\s+([,.:;!?])", RegexOptions.Compiled);
         private static readonly Regex SpacingAfterPunctRegex = new Regex(@"([,.:;!?])([^\s0-9,.:;!?])", RegexOptions.Compiled);
-        private static readonly Regex SentenceCapitalRegex = new Regex(@"(?:^|[.!?]\s+)([a-zçğıöşü])", RegexOptions.Compiled);
 
         static FreeTextImprover()
         {
@@ -95,7 +94,7 @@ namespace YaziciCS.Services
         {
             if (string.IsNullOrWhiteSpace(input)) return input;
 
-            // 1. Deasciify (0-allocation in-place buffer ile)
+            // 1. Deasciify (0-allocation in-place buffer ile, harf büyüklüklerini birebir korur)
             string res = Deasciifier.Deasciify(input);
 
             // 2. Tek geçişte tüm yazım hatalarını ve kelimeleri düzelt (Harf büyüklüğünü koruyarak)
@@ -112,12 +111,6 @@ namespace YaziciCS.Services
             res = MultipleSpacesRegex.Replace(res, " ");
             res = SpacingBeforePunctRegex.Replace(res, "$1");
             res = SpacingAfterPunctRegex.Replace(res, "$1 $2");
-
-            // 4. Cümle başı büyük harf
-            res = SentenceCapitalRegex.Replace(res, m =>
-            {
-                return m.Value[..^1] + char.ToUpper(m.Value[^1], TrCulture);
-            });
 
             return res.Trim();
         }

@@ -106,30 +106,7 @@ function normalizePunctuationAndSpacing(input: string): string {
   // Normalize Turkish apostrophe
   res = res.replace(/([a-zA-ZçğıöşüÇĞİÖŞÜ])\s*['’`´]\s*([a-zA-ZçğıöşüÇĞİÖŞÜ])/g, "$1'$2");
 
-  // Capitalize first letter of every sentence
-  res = res.replace(/(?:^|[.!?]\s+)([a-zçğıöşü])/g, (match, char) => {
-    return match.slice(0, -1) + char.toLocaleUpperCase('tr-TR');
-  });
-
-  // Ensure first character of entire text is capitalized
-  if (res.length > 0) {
-    const firstChar = res[0];
-    if (/[a-zçğıöşü]/.test(firstChar)) {
-      res = firstChar.toLocaleUpperCase('tr-TR') + res.slice(1);
-    }
-  }
-
-  // If text looks like a complete sentence without ending punctuation, append period
-  const trimmed = res.trim();
-  if (
-    trimmed.length > 5 &&
-    !/[.!?…:;]$/.test(trimmed) &&
-    !trimmed.includes('\n')
-  ) {
-    res = trimmed + '.';
-  }
-
-  return res;
+  return res.trim();
 }
 
 /**
