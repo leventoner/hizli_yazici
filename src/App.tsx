@@ -177,6 +177,11 @@ export const App: React.FC = () => {
         e.preventDefault();
         handleImproveText();
       }
+
+      // Ctrl+A / Cmd+A ile tümünü seçtiğinde yüzer menüyü aç
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        setTimeout(handleSelectText, 40);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -679,6 +684,7 @@ export const App: React.FC = () => {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onSelect={handleSelectText}
+                onKeyUp={handleSelectText}
                 placeholder="Metninizi buraya yazın veya yapıştırın. Belirli bir kısmı seçtiğinizde yüzer menü otomatik açılacaktır..."
                 rows={10}
                 className="w-full bg-transparent resize-y text-slate-100 text-sm md:text-base leading-relaxed placeholder:text-slate-600 focus:outline-none"

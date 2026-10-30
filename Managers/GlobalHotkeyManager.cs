@@ -1,11 +1,15 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace YaziciCS.Managers
 {
     public static class GlobalHotkeyManager
     {
+        [DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+
         private static GlobalKeyboardHook? keyboardHook;
         private static bool isCtrlDown = false;
         private static bool isShiftDown = false;
@@ -28,6 +32,11 @@ namespace YaziciCS.Managers
             else if (vkCode == 0x10 || vkCode == 0xA0 || vkCode == 0xA1)
             {
                 isShiftDown = isDown;
+            }
+            // VK_A = 0x41 (Ctrl + A -> Select All)
+            else if (vkCode == 0x41 && isDown && (isCtrlDown || (GetKeyState(0x11) & 0x8000) != 0) && !isShiftDown)
+            {
+                SelectionManager.TriggerSelectionCheckFromKeyboard();
             }
             // VK_C = 0x43
             else if (vkCode == 0x43 && isDown && isCtrlDown && !isShiftDown)

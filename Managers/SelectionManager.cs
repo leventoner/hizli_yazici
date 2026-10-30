@@ -83,6 +83,30 @@ namespace YaziciCS.Managers
         [DllImport("user32.dll")]
         private static extern short GetKeyState(int nVirtKey);
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -235,6 +259,44 @@ namespace YaziciCS.Managers
                 if (reqId != currentRequestId) return;
 
                 await CheckSelectionAsync(centerX, topY, bottomY, reqId);
+            });
+        }
+
+        /// <summary>
+        /// Ctrl+A veya klavye seçim kısayolu kullanıldığında yüzen menüyü tetikler.
+        /// </summary>
+        public static void TriggerSelectionCheckFromKeyboard()
+        {
+            int reqId = Interlocked.Increment(ref currentRequestId);
+            Task.Run(async () =>
+            {
+                // Aktif uygulamanın (Chrome, Word, Notepad vb.) Ctrl+A seçimini tamamlamasını bekle
+                await Task.Delay(130);
+                if (reqId != currentRequestId) return;
+
+                int cx = 0, ty = 0, by = 0;
+
+                // 1. Mevcut fare imleci konumunu al
+                if (GetCursorPos(out POINT pt))
+                {
+                    cx = pt.X;
+                    ty = pt.Y - 10;
+                    by = pt.Y + 10;
+                }
+
+                // 2. İmleç ekran dışındaysa veya (0,0) ise aktif pencerenin merkezini kullan
+                IntPtr fg = GetForegroundWindow();
+                if (fg != IntPtr.Zero && GetWindowRect(fg, out RECT winRect))
+                {
+                    if (cx <= 0 && ty <= 0)
+                    {
+                        cx = (winRect.Left + winRect.Right) / 2;
+                        ty = winRect.Top + 60;
+                        by = winRect.Top + 100;
+                    }
+                }
+
+                await CheckSelectionAsync(cx, ty, by, reqId);
             });
         }
 
