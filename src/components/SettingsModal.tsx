@@ -220,7 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
               <Keyboard className="w-4 h-4" style={{ color: form.color_theme }} />
-              <h4>Klavye Kısayolları & Ses Süresi</h4>
+              <h4>Klavye Kısayolları</h4>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -247,26 +247,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   placeholder="ctrl+shift+y"
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-mono text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  Maksimum Ses Kayıt Süresi (Saniye)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="3"
-                    max="60"
-                    step="1"
-                    value={form.stt_duration}
-                    onChange={(e) => setForm({ ...form, stt_duration: parseInt(e.target.value, 10) })}
-                    className="flex-1 accent-indigo-500"
-                  />
-                  <span className="text-sm font-mono text-white w-12 text-right">
-                    {form.stt_duration}s
-                  </span>
-                </div>
               </div>
 
               <div>

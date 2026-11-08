@@ -68,7 +68,7 @@ namespace YaziciCS.UI
             // konumlanır ve kullanıcı tarafından görülemez.
             Rect workArea = GetWorkAreaForPoint(dipCenterX, dipTopY, scaleX, scaleY);
 
-            double menuWidth = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : 228);
+            double menuWidth = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : 180);
             double menuHeight = ActualHeight > 0 ? ActualHeight : (Height > 0 ? Height : 48);
 
             // Yatay ortalama ve çalışma alanı sınırları
@@ -236,14 +236,5 @@ namespace YaziciCS.UI
             HideMenu(actionExecuted: true);
             await ActionHandler.HandleTranslateDutchClipboardAsync(triggerCopy: false, sourceText: source);
         }
-
-        private async void BtnVoice_Click(object sender, RoutedEventArgs e)
-        {
-            SelectionManager.NotifyActionExecuted();
-            HideMenu(actionExecuted: true);
-            await ActionHandler.HandleSpeechToTextAsync();
-        }
-
-        private async void BtnAudio_Click(object sender, RoutedEventArgs e) => BtnVoice_Click(sender, e);
     }
 }

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Loader2, Sparkles, Volume2, Check } from 'lucide-react';
+import { Mic, Square, Loader2, Sparkles, Volume2, Check, X, Copy } from 'lucide-react';
 
 interface AudioRecorderModalProps {
   isOpen: boolean;
-  durationSeconds: number;
+  durationSeconds?: number;
   themeColor: string;
   onClose: () => void;
   onTranscriptionComplete: (text: string) => void;
@@ -12,18 +12,18 @@ interface AudioRecorderModalProps {
 
 export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
   isOpen,
-  durationSeconds,
   themeColor,
   onClose,
   onTranscriptionComplete,
   onError,
 }) => {
   const [isRecording, setIsRecording] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(durationSeconds);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [interimText, setInterimText] = useState('');
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [detectedEngine, setDetectedEngine] = useState<string>('Web Speech + Gemini AI');
+  const [transcribedResult, setTranscribedResult] = useState('');
+  const [frequencies, setFrequencies] = useState<number[]>(new Array(20).fill(6));
+  const [copied, setCopied] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -34,13 +34,21 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
   const speechRecognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef<string>('');
   const recordedMimeTypeRef = useRef<string>('audio/webm');
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Bar weights for Gaussian distribution waveform
+  const barWeights = [
+    0.25, 0.35, 0.5, 0.65, 0.8, 0.92, 1.0, 1.15, 1.25, 1.3,
+    1.3, 1.25, 1.15, 1.0, 0.92, 0.8, 0.65, 0.5, 0.35, 0.25
+  ];
 
   useEffect(() => {
     if (isOpen) {
-      setSecondsLeft(durationSeconds);
+      setElapsedSeconds(0);
       setInterimText('');
+      setTranscribedResult('');
       finalTranscriptRef.current = '';
-      startRecording();
+      setFrequencies(new Array(20).fill(6));
     } else {
       stopRecordingCleanup();
     }
@@ -53,6 +61,12 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
   const stopRecordingCleanup = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       try {
         mediaRecorderRef.current.stop();
@@ -75,9 +89,14 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
     try {
       audioChunksRef.current = [];
       finalTranscriptRef.current = '';
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setInterimText('');
+      setTranscribedResult('');
+      setElapsedSeconds(0);
 
-      // Audio analysis for waveform animation
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // Audio analysis for frequency waveform animation
       try {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         audioContextRef.current = audioCtx;
@@ -88,18 +107,28 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
         source.connect(analyser);
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        const updateLevel = () => {
+        const updateVisualizer = () => {
           if (!analyserRef.current) return;
           analyserRef.current.getByteFrequencyData(dataArray);
+
+          // Calculate average sound level
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
           }
-          const avg = sum / dataArray.length;
-          setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
-          animFrameRef.current = requestAnimationFrame(updateLevel);
+          const avgLevel = sum / (dataArray.length * 128); // 0.0 to 1.0
+
+          // Map to 20 waveform bars
+          const nextBars = barWeights.map((w) => {
+            const jitter = 0.85 + Math.random() * 0.3;
+            const h = Math.round(6 + avgLevel * 34 * w * jitter);
+            return Math.min(38, Math.max(6, h));
+          });
+          setFrequencies(nextBars);
+
+          animFrameRef.current = requestAnimationFrame(updateVisualizer);
         };
-        updateLevel();
+        updateVisualizer();
       } catch (err) {
         console.warn('AudioContext visualization not available:', err);
       }
@@ -141,13 +170,9 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
 
           recognition.start();
           speechRecognitionRef.current = recognition;
-          setDetectedEngine('Canlı Web Speech (tr-TR) + Gemini');
         } catch (e) {
           console.warn('SpeechRecognition failed to start:', e);
-          setDetectedEngine('Gemini AI Multimodal');
         }
-      } else {
-        setDetectedEngine('Gemini AI Multimodal');
       }
 
       // Determine supported mimeType safely
@@ -178,31 +203,31 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
       };
 
       recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
         await processAudioPayload();
       };
 
       recorder.start(500);
       setIsRecording(true);
 
-      // Countdown timer
-      let remaining = durationSeconds;
+      // Increment elapsed timer (No 10s auto-stop!)
       timerRef.current = setInterval(() => {
-        remaining -= 1;
-        setSecondsLeft(remaining);
-        if (remaining <= 0) {
-          clearInterval(timerRef.current);
-          finishRecording();
-        }
+        setElapsedSeconds((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
       console.error('Microphone error:', err);
-      onError('Mikrofona erişilemedi. Lütfen tarayıcı izinlerini kontrol edin.');
-      onClose();
+      onError('Mikrofona erişilemedi. Lütfen tarayıcı mikrofon izinlerini kontrol edin.');
     }
   };
 
-  const finishRecording = () => {
+  const handleStopRecording = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    setFrequencies(new Array(20).fill(6));
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       try {
         mediaRecorderRef.current.stop();
@@ -214,7 +239,6 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
       } catch {}
     }
     setIsRecording(false);
-    if (timerRef.current) clearInterval(timerRef.current);
   };
 
   const processAudioPayload = async () => {
@@ -249,170 +273,213 @@ export const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({
         }),
       });
 
+      let finalTranscribed = '';
+
       if (res.ok) {
         const data = await res.json();
         const serverTranscription = (data.transcription || '').trim();
         if (serverTranscription) {
-          onTranscriptionComplete(serverTranscription);
-          onClose();
-          return;
+          finalTranscribed = serverTranscription;
         }
       }
 
-      // If server returned error or empty, but Web Speech captured text:
-      if (liveCapturedText) {
-        console.log('Gemini yanıt vermedi, Web Speech canlı transkripsiyonu aktarılıyor:', liveCapturedText);
-        onTranscriptionComplete(liveCapturedText);
-        onClose();
-        return;
+      if (!finalTranscribed && liveCapturedText) {
+        finalTranscribed = liveCapturedText;
       }
 
-      throw new Error('Ses algılanamadı veya metne çevrilemedi.');
+      if (finalTranscribed) {
+        setTranscribedResult(finalTranscribed);
+        // Automatically copy to clipboard!
+        navigator.clipboard?.writeText(finalTranscribed).catch(() => {});
+        onTranscriptionComplete(finalTranscribed);
+      } else {
+        throw new Error('Ses algılanamadı veya metne çevrilemedi.');
+      }
     } catch (err: any) {
       console.error('Transcription error:', err);
       if (liveCapturedText) {
+        setTranscribedResult(liveCapturedText);
+        navigator.clipboard?.writeText(liveCapturedText).catch(() => {});
         onTranscriptionComplete(liveCapturedText);
-        onClose();
       } else {
         onError(err.message || 'Ses işleme sırasında bir hata meydana geldi.');
-        onClose();
       }
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const handleCopyResult = () => {
+    if (transcribedResult) {
+      navigator.clipboard?.writeText(transcribedResult);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   if (!isOpen) return null;
 
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  const timeFormatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
+      <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center overflow-hidden">
+        
         {/* Glow ambient background */}
         <div
-          className="absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-500"
-          style={{ backgroundColor: themeColor, transform: `scale(${1 + audioLevel / 50})` }}
+          className="absolute -top-20 -left-20 w-44 h-44 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-300"
+          style={{ backgroundColor: isRecording ? '#10b981' : themeColor }}
         />
         <div
-          className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-500"
-          style={{ backgroundColor: themeColor, transform: `scale(${1 + audioLevel / 50})` }}
+          className="absolute -bottom-20 -right-20 w-44 h-44 rounded-full blur-3xl opacity-20 pointer-events-none transition-all duration-300"
+          style={{ backgroundColor: isRecording ? '#06b6d4' : themeColor }}
         />
 
-        {/* Status Header */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-          <span className="text-xs font-semibold tracking-wider uppercase text-slate-400">
-            {isProcessing ? 'Ses Metne Dönüştürülüyor...' : 'Ses Kaydediliyor'}
-          </span>
-        </div>
-
-        <div className="mb-4">
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 inline-flex items-center gap-1">
-            <Volume2 className="w-3 h-3 text-emerald-400" />
-            {detectedEngine}
-          </span>
-        </div>
-
-        {/* Central Pulse Microphone */}
-        <div className="relative my-2 flex items-center justify-center">
-          {isRecording && (
-            <>
-              <div
-                className="absolute w-36 h-36 rounded-full border border-rose-500/30 animate-ping opacity-60"
-                style={{ animationDuration: '2s' }}
-              />
-              <div
-                className="absolute w-28 h-28 rounded-full opacity-40 transition-transform duration-75"
-                style={{
-                  backgroundColor: themeColor,
-                  transform: `scale(${1 + audioLevel / 80})`,
-                }}
-              />
-            </>
-          )}
-
-          <div
-            className="relative z-10 w-24 h-24 rounded-full flex items-center justify-center shadow-xl transition-all"
-            style={{
-              backgroundColor: isProcessing ? '#475569' : '#dc2626',
-            }}
-          >
-            {isProcessing ? (
-              <Loader2 className="w-10 h-10 text-white animate-spin" />
-            ) : (
-              <Mic className="w-10 h-10 text-white" />
-            )}
+        {/* Top Header */}
+        <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-slate-800 text-sm">🎙️</span>
+            <div className="text-left">
+              <h3 className="text-sm font-bold text-white leading-tight">Sesle Yaz</h3>
+              <p className="text-[10px] text-slate-400">Yüzen Ses Kaydı &amp; Çevirici</p>
+            </div>
           </div>
-        </div>
-
-        {/* Live Audio Visualizer Bars */}
-        <div className="flex items-center justify-center gap-1.5 h-8 my-3">
-          {[40, 70, 90, 60, 30, 80, 100, 70, 50, 85, 65, 40].map((h, i) => {
-            const dynamicHeight = isRecording ? Math.max(6, (h * (audioLevel + 20)) / 100) : 6;
-            return (
-              <div
-                key={i}
-                className="w-1.5 rounded-full transition-all duration-75"
-                style={{
-                  height: `${dynamicHeight}px`,
-                  backgroundColor: isRecording ? themeColor : '#475569',
-                }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Timer */}
-        <div className="text-3xl font-mono font-bold text-white tracking-wider mb-1">
-          00:{secondsLeft < 10 ? `0${secondsLeft}` : secondsLeft}
-        </div>
-        <p className="text-xs text-slate-400 max-w-xs mb-3">
-          Konuşun; sesiniz canlı olarak algılanır ve kaydı bitirdiğinizde tam metin olarak aktarılır.
-        </p>
-
-        {/* Live Transcript Preview */}
-        {interimText ? (
-          <div className="w-full bg-slate-800/90 border border-emerald-500/40 rounded-xl p-3 text-xs text-slate-200 font-sans text-left mb-4 max-h-24 overflow-y-auto">
-            <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1 mb-1">
-              <Check className="w-3 h-3" /> Canlı Algılanan Metin:
-            </span>
-            &ldquo;{interimText}&rdquo;
-          </div>
-        ) : (
-          <div className="w-full bg-slate-800/40 border border-slate-700/40 rounded-xl p-2.5 text-xs text-slate-500 text-center mb-4">
-            Konuşmaya başladığınızda canlı metin burada belirecektir...
-          </div>
-        )}
-
-        {/* Control Buttons */}
-        <div className="flex items-center gap-3 w-full mt-1">
           <button
+            type="button"
             onClick={() => {
               stopRecordingCleanup();
               onClose();
             }}
-            disabled={isProcessing}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-medium transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
-            İptal
-          </button>
-          <button
-            onClick={finishRecording}
-            disabled={isProcessing}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-rose-900/30 transition-transform active:scale-95 disabled:opacity-50"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                İşleniyor
-              </>
-            ) : (
-              <>
-                <Square className="w-4 h-4 fill-white" />
-                Kaydı Bitir
-              </>
-            )}
+            <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Status Indicator */}
+        <div className="flex items-center gap-2 mb-2">
+          <span
+            className={`w-2.5 h-2.5 rounded-full ${
+              isRecording
+                ? 'bg-rose-500 animate-pulse'
+                : isProcessing
+                ? 'bg-blue-400 animate-spin'
+                : 'bg-emerald-400'
+            }`}
+          />
+          <span className="text-xs font-semibold tracking-wider text-slate-300">
+            {isProcessing
+              ? 'Metne Çevriliyor... (Lokal AI)'
+              : isRecording
+              ? 'Kaydediliyor... Konuşun'
+              : transcribedResult
+              ? 'Tamamlandı (Panoya Kopyalandı)'
+              : "Kayıt için 'Başlat' düğmesine basın"}
+          </span>
+        </div>
+
+        {/* Timer Display */}
+        <div className="text-3xl font-mono font-bold text-white tracking-wider my-2">
+          {timeFormatted}
+        </div>
+
+        {/* 20 Frequency Waveform Bars */}
+        <div className="w-full bg-slate-950/70 border border-slate-800/90 rounded-2xl py-3 px-4 my-2 flex items-center justify-center gap-1.5 h-14">
+          {frequencies.map((h, i) => (
+            <div
+              key={i}
+              className="w-1.5 rounded-full transition-all duration-75"
+              style={{
+                height: `${h}px`,
+                background: isRecording
+                  ? 'linear-gradient(180deg, #06b6d4 0%, #10b981 100%)'
+                  : '#1e293b',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Live Interim Speech Preview during recording */}
+        {isRecording && interimText && (
+          <div className="w-full bg-slate-900/80 border border-emerald-500/30 rounded-xl p-3 text-xs text-slate-200 text-left my-2 max-h-20 overflow-y-auto">
+            <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1 mb-1">
+              <Check className="w-3 h-3" /> Canlı Algılanan:
+            </span>
+            &ldquo;{interimText}&rdquo;
+          </div>
+        )}
+
+        {/* Transcribed Result Area */}
+        {transcribedResult && (
+          <div className="w-full bg-blue-950/30 border border-blue-500/40 rounded-xl p-3 text-xs text-slate-100 text-left my-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
+                <Check className="w-3 h-3" /> Metne Çevrildi &amp; Kopyalandı:
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyResult}
+                className="text-[11px] font-medium text-sky-400 hover:text-sky-300 flex items-center gap-1"
+              >
+                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Kopyalandı' : 'Kopyala'}
+              </button>
+            </div>
+            <p className="font-mono text-slate-200">{transcribedResult}</p>
+          </div>
+        )}
+
+        {/* Main Controls: Start or Stop */}
+        <div className="w-full mt-4 flex items-center gap-3">
+          {!isRecording ? (
+            <button
+              type="button"
+              onClick={startRecording}
+              disabled={isProcessing}
+              className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  İşleniyor...
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4" />
+                  Kaydı Başlat
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStopRecording}
+              disabled={isProcessing}
+              className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-900/50 active:scale-95 transition-all"
+            >
+              <Square className="w-4 h-4 fill-white" />
+              Durdur &amp; Metne Çevir
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              stopRecordingCleanup();
+              onClose();
+            }}
+            className="py-3 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-medium transition-colors"
+          >
+            Kapat
+          </button>
+        </div>
+
+        {/* Subtle Footer Note */}
+        <p className="text-[10px] text-slate-500 mt-3">
+          Kayıt durdurulduğunda sonuç doğrudan panoya kopyalanır.
+        </p>
       </div>
     </div>
   );

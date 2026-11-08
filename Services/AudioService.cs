@@ -22,6 +22,7 @@ namespace YaziciCS.Services
         private static string? _cachedWhisperModelPath;
         private static readonly object _whisperLock = new();
 
+        public static event Action<float>? AudioLevelChanged;
         public static bool IsRecording { get; private set; } = false;
 
         public static void StopRecording()
@@ -38,7 +39,7 @@ namespace YaziciCS.Services
         [DllImport("winmm.dll", EntryPoint = "mciSendStringA", CharSet = CharSet.Ansi, SetLastError = true, ExactSpelling = true)]
         private static extern int mciSendString(string lpstrCommand, StringBuilder? lpstrReturnString, int uReturnLength, IntPtr hwndCallback);
 
-        public static async Task<bool> RecordAudioAsync(string tempFilePath, int durationSeconds)
+        public static async Task<bool> RecordAudioAsync(string tempFilePath, int durationSeconds = 600)
         {
             lock (_recordLock)
             {
@@ -69,6 +70,7 @@ namespace YaziciCS.Services
                 IsRecording = false;
             }
 
+            AudioLevelChanged?.Invoke(0f);
             return File.Exists(tempFilePath) && new FileInfo(tempFilePath).Length > 1000;
         }
 
@@ -93,6 +95,16 @@ namespace YaziciCS.Services
                     try
                     {
                         writer.Write(e.Buffer, 0, e.BytesRecorded);
+
+                        // Canlı ses seviyesi ve frekans genliğini hesapla (0.0f - 1.0f)
+                        float max = 0f;
+                        for (int i = 0; i + 1 < e.BytesRecorded; i += 2)
+                        {
+                            short sample = (short)(e.Buffer[i] | (e.Buffer[i + 1] << 8));
+                            float abs = Math.Abs(sample / 32768f);
+                            if (abs > max) max = abs;
+                        }
+                        AudioLevelChanged?.Invoke(max);
                     }
                     catch { }
                 };

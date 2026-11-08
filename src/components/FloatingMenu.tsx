@@ -8,7 +8,7 @@ interface FloatingMenuProps {
   onTranslateEn: () => void;
   onTranslateFr: () => void;
   onTranslateNl: () => void;
-  onRecordAudio: () => void;
+  onRecordAudio?: () => void;
   onCopy: () => void;
   position?: { top: number; left: number } | null;
   isFloating?: boolean;
@@ -126,18 +126,6 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
         </button>
 
         <div className="w-[1px] h-5 bg-white/20 mx-0.5" />
-
-        {/* Sesle Yazma */}
-        <button
-          type="button"
-          onClick={onRecordAudio}
-          disabled={isLoading}
-          title="Sesle Yazma (Mikrofon)"
-          className="group relative p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 active:scale-95 transition-all disabled:opacity-40"
-        >
-          <Mic className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-          <span className="sr-only">Sesle Yazma</span>
-        </button>
 
         {/* Panoya Kopyala */}
         <button

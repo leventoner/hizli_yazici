@@ -16,6 +16,7 @@ namespace YaziciCS
         private SettingsWindow? settingsWindow;
         private TranslationResultWindow? translationResultWindow;
         private DictionaryWindow? dictionaryWindow;
+        private VoiceRecordingWindow? voiceRecordingWindow;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -23,6 +24,9 @@ namespace YaziciCS
 
             CrashLogger.Initialize();
             SettingsManager.Load();
+
+            // Setup Voice Recording UI handler
+            ActionHandler.OpenVoiceRecordingUI = () => OpenVoiceRecording();
 
             // Setup Notification handler
             ActionHandler.ShowNotification = (title, msg, color) =>
@@ -77,7 +81,7 @@ namespace YaziciCS
 
             var contextMenu = new ContextMenuStrip();
             contextMenu.Items.Add("📖 Sözlük & Çeviri", null, (s, e) => OpenDictionary());
-            contextMenu.Items.Add("🎙️ Sesle Yaz (Ctrl+Shift+Y)", null, (s, e) => _ = ActionHandler.HandleSpeechToTextAsync());
+            contextMenu.Items.Add("🎙️ Sesle Yaz (Ctrl+Shift+Y)", null, (s, e) => OpenVoiceRecording());
             contextMenu.Items.Add(new ToolStripSeparator());
             contextMenu.Items.Add("⚙️ Ayarlar", null, (s, e) => OpenSettings());
             contextMenu.Items.Add(new ToolStripSeparator());
@@ -158,6 +162,25 @@ namespace YaziciCS
                     if (dictionaryWindow.WindowState == WindowState.Minimized)
                         dictionaryWindow.WindowState = WindowState.Normal;
                     dictionaryWindow.Activate();
+                }
+            });
+        }
+
+        public void OpenVoiceRecording()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (voiceRecordingWindow == null || !voiceRecordingWindow.IsLoaded)
+                {
+                    voiceRecordingWindow = new VoiceRecordingWindow();
+                    voiceRecordingWindow.Closed += (s, e) => voiceRecordingWindow = null;
+                    voiceRecordingWindow.Show();
+                }
+                else
+                {
+                    if (voiceRecordingWindow.WindowState == WindowState.Minimized)
+                        voiceRecordingWindow.WindowState = WindowState.Normal;
+                    voiceRecordingWindow.Activate();
                 }
             });
         }

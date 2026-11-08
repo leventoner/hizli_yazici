@@ -562,6 +562,15 @@ export const App: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setIsAudioModalOpen(true)}
+              className="p-2 rounded-xl text-xs font-medium bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 hover:text-white flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Sesle Yaz (Ctrl+Shift+Y)"
+            >
+              <Mic className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Sesle Yaz</span>
+            </button>
+
+            <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-1.5 transition-colors"
               title="Ayarlar"
@@ -699,7 +708,6 @@ export const App: React.FC = () => {
                   onTranslateEn={handleTranslateEn}
                   onTranslateFr={handleTranslateFr}
                   onTranslateNl={handleTranslateNl}
-                  onRecordAudio={() => setIsAudioModalOpen(true)}
                   onCopy={handleCopy}
                   position={selectionMenuPos}
                   isFloating={true}

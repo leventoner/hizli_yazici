@@ -10,6 +10,7 @@ namespace YaziciCS.Managers
     {
         public static Action<string, string, string>? ShowNotification { get; set; }
         public static Action<string, string, string>? ShowTranslationResult { get; set; }
+        public static Action? OpenVoiceRecordingUI { get; set; }
 
         private static async Task SimulateCtrlC()
         {
@@ -195,6 +196,13 @@ namespace YaziciCS.Managers
                 if (!SettingsManager.Current.EnableSpeechToText)
                 {
                     ShowNotification?.Invoke("Uyarı", "Sesle yazma özelliği kapalı.", "#e74c3c");
+                    return;
+                }
+
+                // Yüzen ses kayıt menüsünü aç
+                if (OpenVoiceRecordingUI != null)
+                {
+                    OpenVoiceRecordingUI.Invoke();
                     return;
                 }
 
