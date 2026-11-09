@@ -306,7 +306,7 @@ namespace YaziciCS.Managers
             {
                 // 1. Panoyu kirletmeden önce UI Automation ile seçili metni ve kesin ekran koordinatlarını oku
                 string? uiText = GetSelectedTextViaUIAutomation(out double? uiaCenterX, out double? uiaTopY, out double? uiaBottomY);
-                if (!string.IsNullOrEmpty(uiText))
+                if (uiText != null)
                 {
                     string trimmedUi = uiText.Trim();
                     // En az 2 harfli kelimeleri ("ev", "su", "at", "to", "go") kabul et
@@ -328,11 +328,22 @@ namespace YaziciCS.Managers
                         });
                         return;
                     }
+                    else
+                    {
+                        // UI Automation odaklı öğeyi buldu ve seçimi okudu.
+                        // Ancak seçim sadece boşluk (" "), noktalama veya yetersiz karakter.
+                        // Dolayısıyla gereksiz yere Ctrl+C simülasyonu yapıp panoyu kirletmeye asla gerek YOK.
+                        selectedText = null;
+                        Application.Current?.Dispatcher?.BeginInvoke(() =>
+                        {
+                            menu?.HideMenu();
+                        });
+                        return;
+                    }
                 }
 
                 // 2. UI Automation metin döndüremediyse (Chromium, Word, bazı Win32 pencereler)
                 //    Ctrl+C simülasyonu ile panoya kopyalayıp metni oradan okuyoruz.
-                //    (Eski kodda burada "return" vardı ve menü hiç açılmıyordu.)
                 if (IsConsoleWindowActive())
                 {
                     return;
@@ -340,62 +351,99 @@ namespace YaziciCS.Managers
 
                 uint oldSeq = GetClipboardSequenceNumber();
                 string oldClipboard = await TextService.GetClipboardTextAsync();
+                bool clipboardModified = false;
 
-                // Modern ve atomik SendInput ile Ctrl+C simülasyonu
-                SimulateCtrlC();
-
-                await Task.Delay(100);
-                if (reqId != currentRequestId) return;
-
-                uint newSeq = GetClipboardSequenceNumber();
-                string newClipboard = await TextService.GetClipboardTextAsync();
-
-                bool changed = (newSeq != oldSeq) || (newClipboard != oldClipboard);
-                if (!changed || string.IsNullOrWhiteSpace(newClipboard))
+                try
                 {
-                    selectedText = null;
-                    return;
-                }
+                    // Modern ve atomik SendInput ile Ctrl+C simülasyonu
+                    SimulateCtrlC();
 
-                string trimmed = newClipboard.Trim();
-                int letterCount = CountLetters(trimmed);
+                    await Task.Delay(110);
 
-                // En az 2 harf seçilmiş olmalı
-                if (trimmed.Length < 2 || letterCount < 2)
-                {
-                    selectedText = null;
-                    if (newSeq != oldSeq)
+                    uint newSeq = GetClipboardSequenceNumber();
+                    string newClipboard = await TextService.GetClipboardTextAsync();
+
+                    bool changed = (newSeq != oldSeq) || (newClipboard != oldClipboard);
+                    if (changed)
                     {
-                        await TextService.SetClipboardTextAsync(oldClipboard);
+                        clipboardModified = true;
                     }
+
+                    if (reqId != currentRequestId)
+                    {
+                        return;
+                    }
+
+                    if (!changed || string.IsNullOrWhiteSpace(newClipboard))
+                    {
+                        selectedText = null;
+                        return;
+                    }
+
+                    string trimmed = newClipboard.Trim();
+                    int letterCount = CountLetters(trimmed);
+
+                    // En az 2 harf seçilmiş olmalı
+                    if (trimmed.Length < 2 || letterCount < 2)
+                    {
+                        selectedText = null;
+                        Application.Current?.Dispatcher?.BeginInvoke(() =>
+                        {
+                            menu?.HideMenu();
+                        });
+                        return;
+                    }
+
+                    // Geçerli metin seçildi: belleğe kaydet (yüzen menü butonları buradan okur)
+                    selectedText = trimmed;
+
                     Application.Current?.Dispatcher?.BeginInvoke(() =>
                     {
-                        menu?.HideMenu();
+                        if (reqId == currentRequestId)
+                        {
+                            menu?.ShowAt(centerX, topY, bottomY);
+                        }
                     });
-                    return;
                 }
-
-                selectedText = trimmed;
-
-                // Pano hâlâ bizim kopyaladığımız metni içeriyorsa eski haline geri yüklenir.
-                // (Kullanıcı bu arada kendi kopyalama işlemini yaptıysa dokunulmaz.)
-                string currentClip = await TextService.GetClipboardTextAsync();
-                if (currentClip.Trim() == trimmed)
+                finally
                 {
-                    await TextService.SetClipboardTextAsync(oldClipboard);
-                }
-
-                Application.Current?.Dispatcher?.BeginInvoke(() =>
-                {
-                    if (reqId == currentRequestId)
+                    // KRİTİK: Kullanıcı sadece seçim yaptı (veya boşluk seçti);
+                    // Kullanıcının panosundaki kopyalanmış veriler (örneğin az önce çevrilmiş metin)
+                    // ASLA bozulmamalı ve silinmemelidir.
+                    // Bu nedenle, Ctrl+C simülasyonu panoyu değiştirmişse, orijinal pano içeriği
+                    // her koşulda (boşluk seçimi, yetersiz karakter, iptal veya geçerli seçim) eksiksiz geri yüklenir.
+                    if (clipboardModified)
                     {
-                        menu?.ShowAt(centerX, topY, bottomY);
+                        await RestoreClipboardSafelyAsync(oldClipboard);
                     }
-                });
+                }
             }
             catch (Exception ex)
             {
                 CrashLogger.Log(ex, "SelectionManager.CheckSelectionAsync");
+            }
+        }
+
+        private static async Task RestoreClipboardSafelyAsync(string originalText)
+        {
+            try
+            {
+                // Hedef uygulamanın (Chrome, Word vb.) kopyalama ve pano kilidini bırakmasını bekle
+                await Task.Delay(40);
+                await TextService.SetClipboardTextAsync(originalText);
+
+                // Gecikmeli WM_COPY / race condition koruması:
+                // Tarayıcı arka plan thread'i geç yazmışsa tekrar doğrula
+                await Task.Delay(40);
+                string current = await TextService.GetClipboardTextAsync();
+                if (current != originalText)
+                {
+                    await TextService.SetClipboardTextAsync(originalText);
+                }
+            }
+            catch (Exception ex)
+            {
+                CrashLogger.Log(ex, "SelectionManager.RestoreClipboardSafelyAsync");
             }
         }
 

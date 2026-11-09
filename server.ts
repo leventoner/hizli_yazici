@@ -16,8 +16,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = '0.0.0.0';
+
+function resolvePort(): number {
+  const portArgIdx = process.argv.indexOf('--port');
+  if (portArgIdx !== -1 && process.argv[portArgIdx + 1]) {
+    const parsed = parseInt(process.argv[portArgIdx + 1], 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  // Environment constraint explicitly requires port 3000 for the app dev server.
+  // In Cloud Run containers, process.env.PORT is often 8080 where nginx runs and reverse-proxies to 3000.
+  if (process.env.PORT && process.env.PORT !== '8080') {
+    const parsed = parseInt(process.env.PORT, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 3000;
+}
+
+function resolveHost(): string {
+  const hostArgIdx = process.argv.indexOf('--host');
+  if (hostArgIdx !== -1 && process.argv[hostArgIdx + 1]) {
+    return process.argv[hostArgIdx + 1];
+  }
+  return '0.0.0.0';
+}
+
+const PORT = resolvePort();
+const HOST = resolveHost();
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -443,7 +467,10 @@ async function setupServer() {
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
